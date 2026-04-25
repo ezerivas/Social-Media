@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse
 from config import VERIFY_TOKEN
 from sheets import guardar_mensaje
+from ai import generar_respuesta
 import json
 
 app = FastAPI()
@@ -18,7 +19,6 @@ def verify(
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
     hub_challenge: str = Query(None, alias="hub.challenge"),
 ):
-
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
         return PlainTextResponse(str(hub_challenge))
 
@@ -36,7 +36,6 @@ async def webhook(request: Request):
         for messaging in entry.get("messaging", []):
 
             sender_id = messaging.get("sender", {}).get("id")
-
             message = messaging.get("message", {})
             text = message.get("text")
 
@@ -44,8 +43,12 @@ async def webhook(request: Request):
                 print(f"Usuario {sender_id}: {text}")
 
                 try:
-                    guardar_mensaje(sender_id, text)
+                    respuesta = generar_respuesta(text)
+                    print("IA:", respuesta)
+
+                    guardar_mensaje(sender_id, text, respuesta)
+
                 except Exception as e:
-                    print("ERROR Sheets:", e)
+                    print("ERROR:", e)
 
     return {"status": "ok"}

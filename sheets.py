@@ -21,10 +21,11 @@ def get_sheet():
     return client.open("mensajes_bot").sheet1
 
 
-def guardar_mensaje(user_id, text):
+def guardar_mensaje(user_id, text, respuesta):
     sheet = get_sheet()
     sheet.append_row([
         str(datetime.now()),
         user_id,
-        text
+        text,
+        respuesta
     ])
