@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse
 from config import VERIFY_TOKEN
+from sheets import guardar_mensaje
 import json
 
 app = FastAPI()
@@ -28,5 +29,18 @@ async def webhook(request: Request):
 
     print("EVENT:")
     print(json.dumps(data, indent=2))
+
+    for entry in data.get("entry", []):
+        for messaging in entry.get("messaging", []):
+
+            sender_id = messaging["sender"]["id"]
+
+            if "message" in messaging:
+                text = messaging["message"].get("text")
+
+                print(f"Usuario {sender_id}: {text}")
+
+                # 👉 guardar en Google Sheets
+                guardar_mensaje(sender_id, text)
 
     return {"status": "ok"}
