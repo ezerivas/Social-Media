@@ -4,7 +4,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
 # 👇 leer JSON desde variable de entorno
 creds_json = json.loads(os.getenv("GOOGLE_CREDENTIALS_JSON"))
