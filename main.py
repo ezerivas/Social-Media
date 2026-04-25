@@ -6,6 +6,7 @@ import json
 
 app = FastAPI()
 
+
 @app.get("/")
 def home():
     return {"status": "ok"}
@@ -17,10 +18,11 @@ def verify(
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
     hub_challenge: str = Query(None, alias="hub.challenge"),
 ):
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return PlainTextResponse(hub_challenge)
 
-    return PlainTextResponse("error")
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        return PlainTextResponse(str(hub_challenge))
+
+    return PlainTextResponse("error", status_code=403)
 
 
 @app.post("/webhook")
@@ -33,14 +35,17 @@ async def webhook(request: Request):
     for entry in data.get("entry", []):
         for messaging in entry.get("messaging", []):
 
-            sender_id = messaging["sender"]["id"]
+            sender_id = messaging.get("sender", {}).get("id")
 
-            if "message" in messaging:
-                text = messaging["message"].get("text")
+            message = messaging.get("message", {})
+            text = message.get("text")
 
+            if sender_id and text:
                 print(f"Usuario {sender_id}: {text}")
 
-                # 👉 guardar en Google Sheets
-                guardar_mensaje(sender_id, text)
+                try:
+                    guardar_mensaje(sender_id, text)
+                except Exception as e:
+                    print("ERROR Sheets:", e)
 
     return {"status": "ok"}
