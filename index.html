@@ -16,8 +16,7 @@
 <div id="messages"></div>
 
 <script>
-const API = "https://social-media-production-0ef2.up.railway.app/"; // 👈 cambiar esto
-
+const API = "https://social-media-production-0ef2.up.railway.app";
 async function loadConversations() {
   const res = await fetch(API + "/conversations");
   const data = await res.json();
