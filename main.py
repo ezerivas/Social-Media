@@ -76,3 +76,27 @@ def get_conversations():
 
     finally:
         db.close()
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_messages(conversation_id: int):
+    db = SessionLocal()
+
+    try:
+        messages = db.query(Message).filter(
+            Message.conversation_id == conversation_id
+        ).all()
+
+        result = []
+        for m in messages:
+            result.append({
+                "id": m.id,
+                "sender": m.sender,
+                "text": m.text,
+                "timestamp": m.timestamp
+            })
+
+        return result
+
+    finally:
+        db.close()
