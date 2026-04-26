@@ -4,6 +4,8 @@ from fastapi.responses import PlainTextResponse
 from config import VERIFY_TOKEN
 from database import engine, Base, SessionLocal
 from crud import save_message
+from database import SessionLocal
+from models import Conversation
 
 import json
 
@@ -51,3 +53,26 @@ async def webhook(request: Request):
                     db.close()
 
     return {"status": "ok"}
+
+
+@app.get("/conversations")
+def get_conversations():
+    db = SessionLocal()
+
+    try:
+        conversations = db.query(Conversation).all()
+
+        result = []
+        for c in conversations:
+            result.append({
+                "id": c.id,
+                "user_id": c.user_id,
+                "canal": c.canal,
+                "estado": c.estado,
+                "last_message_at": c.last_message_at
+            })
+
+        return result
+
+    finally:
+        db.close()
