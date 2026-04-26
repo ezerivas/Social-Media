@@ -1,11 +1,18 @@
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse
+
 from config import VERIFY_TOKEN
-from sheets import guardar_mensaje
-from ai import generar_respuesta
+from database import engine, Base, SessionLocal
+from crud import save_message
+
 import json
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
@@ -20,35 +27,27 @@ def verify(
     hub_challenge: str = Query(None, alias="hub.challenge"),
 ):
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
-        return PlainTextResponse(str(hub_challenge))
+        return PlainTextResponse(hub_challenge)
 
-    return PlainTextResponse("error", status_code=403)
+    return PlainTextResponse("error")
 
 
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
 
-    print("EVENT:")
-    print(json.dumps(data, indent=2))
-
     for entry in data.get("entry", []):
         for messaging in entry.get("messaging", []):
 
-            sender_id = messaging.get("sender", {}).get("id")
-            message = messaging.get("message", {})
-            text = message.get("text")
+            sender_id = messaging["sender"]["id"]
 
-            if sender_id and text:
-                print(f"Usuario {sender_id}: {text}")
+            if "message" in messaging:
+                text = messaging["message"].get("text")
 
+                db = SessionLocal()
                 try:
-                    respuesta = generar_respuesta(text)
-                    print("IA:", respuesta)
-
-                    guardar_mensaje(sender_id, text, respuesta)
-
-                except Exception as e:
-                    print("ERROR:", e)
+                    save_message(db, sender_id, text)
+                finally:
+                    db.close()
 
     return {"status": "ok"}
