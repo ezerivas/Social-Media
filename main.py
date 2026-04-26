@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse
+
 
 from config import VERIFY_TOKEN
 from database import engine, Base, SessionLocal
@@ -12,6 +14,10 @@ import json
 
 app = FastAPI()
 
+
+@app.get("/")
+def home():
+    return FileResponse("index.html")
 
 @app.on_event("startup")
 def startup():
