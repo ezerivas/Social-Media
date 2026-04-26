@@ -6,6 +6,7 @@ from database import engine, Base, SessionLocal
 from crud import save_message
 from database import SessionLocal
 from models import Conversation
+from models import Message
 
 import json
 
