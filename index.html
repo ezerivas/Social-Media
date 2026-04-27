@@ -1,24 +1,7 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Dashboard</title>
-</head>
-<body>
-
-<h2>Conversaciones</h2>
-<ul id="conversations"></ul>
-
-<h2>Mensajes</h2>
-<ul id="messages"></ul>
-
-<input id="text" placeholder="Escribir mensaje">
-<button onclick="sendMessage()">Enviar</button>
-
 <script>
 let currentConversation = null;
 let currentUser = null;
 
-// cargar conversaciones
 async function loadConversations() {
     const res = await fetch('/conversations');
     const data = await res.json();
@@ -28,11 +11,11 @@ async function loadConversations() {
 
     data.forEach(c => {
         const li = document.createElement('li');
-        li.innerText = c.name || c.external_id;
+        li.innerText = c.user_name || c.user_external_id;
 
         li.onclick = () => {
             currentConversation = c.id;
-            currentUser = c.external_id;
+            currentUser = c.user_external_id;
             loadMessages();
         };
 
@@ -40,7 +23,6 @@ async function loadConversations() {
     });
 }
 
-// cargar mensajes
 async function loadMessages() {
     const res = await fetch(`/conversations/${currentConversation}/messages`);
     const data = await res.json();
@@ -50,12 +32,11 @@ async function loadMessages() {
 
     data.forEach(m => {
         const li = document.createElement('li');
-        li.innerText = `${m.sender}: ${m.text}`;
+        li.innerText = `${m.role}: ${m.content}`;
         list.appendChild(li);
     });
 }
 
-// enviar mensaje
 async function sendMessage() {
     const text = document.getElementById('text').value;
 
@@ -71,11 +52,6 @@ async function sendMessage() {
     loadMessages();
 }
 
-// auto refresh
 setInterval(loadConversations, 3000);
-
 loadConversations();
 </script>
-
-</body>
-</html>

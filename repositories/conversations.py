@@ -1,19 +1,19 @@
 from database import get_connection
 
 
-def get_or_create_conversation(user_id: int):
+def get_or_create_conversation(user_id: int, external_id: str):
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT id, user_id, last_message_at
+        SELECT id, user_id, external_id, last_message_at
         FROM conversations
-        WHERE user_id = %s
-        LIMIT 1
+        WHERE external_id = %s
         """,
-        (user_id,)
+        (external_id,)
     )
+
     conversation = cur.fetchone()
 
     if conversation:
@@ -23,11 +23,11 @@ def get_or_create_conversation(user_id: int):
 
     cur.execute(
         """
-        INSERT INTO conversations (user_id)
-        VALUES (%s)
-        RETURNING id, user_id, last_message_at
+        INSERT INTO conversations (user_id, external_id)
+        VALUES (%s, %s)
+        RETURNING id, user_id, external_id, last_message_at
         """,
-        (user_id,)
+        (user_id, external_id)
     )
 
     conversation = cur.fetchone()
@@ -77,8 +77,8 @@ def get_all_conversations():
     for row in rows:
         conversations.append({
             "id": row[0],
-            "name": row[1],
-            "external_id": row[2],
+            "user_name": row[1],
+            "user_external_id": row[2],
             "last_message_at": row[3]
         })
 
