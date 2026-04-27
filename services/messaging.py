@@ -1,20 +1,15 @@
-from repositories.users import get_user_by_external_id, create_user
-from repositories.conversations import get_conversation_by_user, create_conversation
-from repositories.messages import insert_message
-from services.meta import get_user_name
+from repositories.users import get_or_create_user
+from repositories.conversations import get_or_create_conversation
+from repositories.messages import save_message
 
-def handle_incoming_message(external_id, text, sender="user"):
-    user = get_user_by_external_id(external_id)
 
-    if not user:
-        name = get_user_name(external_id)
-        user = create_user(external_id, name)
+# Maneja mensaje entrante
+def handle_incoming_message(sender_id: str, text: str, name: str = None):
 
-    conv = get_conversation_by_user(user["id"])
+    user_id = get_or_create_user(sender_id, name)
 
-    if not conv:
-        conv = create_conversation(user["id"], external_id)
+    conversation_id = get_or_create_conversation(user_id)
 
-    insert_message(conv["id"], sender, text)
+    save_message(conversation_id, "user", text)
 
-    return conv["id"]
+    return conversation_id

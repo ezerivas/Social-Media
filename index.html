@@ -1,114 +1,79 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Inbox</title>
+    <title>Dashboard</title>
 </head>
 <body>
 
 <h2>Conversaciones</h2>
 <ul id="conversations"></ul>
 
-<hr>
-
 <h2>Mensajes</h2>
 <ul id="messages"></ul>
 
-<input type="text" id="messageInput" placeholder="Escribí un mensaje">
+<input id="text" placeholder="Escribir mensaje">
 <button onclick="sendMessage()">Enviar</button>
 
 <script>
-let currentConversationId = null;
-let currentRecipientId = null;
-let ws = null;
+let currentConversation = null;
+let currentUser = null;
 
-
-// 🔹 abrir websocket por conversación (room)
-function openSocket(conversationId) {
-  if (ws) ws.close();
-
-  const protocol = location.protocol === "https:" ? "wss" : "ws";
-  ws = new WebSocket(`${protocol}://${location.host}/ws/${conversationId}`);
-
-  ws.onmessage = () => {
-    loadMessages(); // actualizar mensajes en tiempo real
-  };
-}
-
-
-// 🔹 cargar conversaciones
+// cargar conversaciones
 async function loadConversations() {
-  const res = await fetch("/conversations");
-  const data = await res.json();
+    const res = await fetch('/conversations');
+    const data = await res.json();
 
-  const list = document.getElementById("conversations");
-  list.innerHTML = "";
+    const list = document.getElementById('conversations');
+    list.innerHTML = '';
 
-  data.forEach(conv => {
-    const li = document.createElement("li");
+    data.forEach(c => {
+        const li = document.createElement('li');
+        li.innerText = c.name || c.external_id;
 
-    // mostrar nombre del usuario
-    li.textContent = `${conv.name} (ID: ${conv.external_id})`;
+        li.onclick = () => {
+            currentConversation = c.id;
+            currentUser = c.external_id;
+            loadMessages();
+        };
 
-    // seleccionar conversación
-    li.onclick = () => {
-      currentConversationId = conv.id;
-      currentRecipientId = conv.external_id;
-
-      openSocket(conv.id); // 🔥 clave
-      loadMessages();
-    };
-
-    list.appendChild(li);
-  });
+        list.appendChild(li);
+    });
 }
 
-
-// 🔹 cargar mensajes
+// cargar mensajes
 async function loadMessages() {
-  if (!currentConversationId) return;
+    const res = await fetch(`/conversations/${currentConversation}/messages`);
+    const data = await res.json();
 
-  const res = await fetch(`/conversations/${currentConversationId}/messages`);
-  const data = await res.json();
+    const list = document.getElementById('messages');
+    list.innerHTML = '';
 
-  const list = document.getElementById("messages");
-  list.innerHTML = "";
-
-  data.forEach(msg => {
-    const li = document.createElement("li");
-
-    li.textContent = `[${msg.sender}] ${msg.text}`;
-
-    list.appendChild(li);
-  });
+    data.forEach(m => {
+        const li = document.createElement('li');
+        li.innerText = `${m.sender}: ${m.text}`;
+        list.appendChild(li);
+    });
 }
 
-
-// 🔹 enviar mensaje
+// enviar mensaje
 async function sendMessage() {
-  const input = document.getElementById("messageInput");
-  const text = input.value;
+    const text = document.getElementById('text').value;
 
-  if (!text || !currentRecipientId) return;
+    await fetch('/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            recipient_id: currentUser,
+            text: text
+        })
+    });
 
-  await fetch("/send", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      recipient_id: currentRecipientId,
-      text: text
-    })
-  });
-
-  input.value = "";
-
-  loadMessages(); // actualización inmediata
+    loadMessages();
 }
 
+// auto refresh
+setInterval(loadConversations, 3000);
 
-// 🔹 carga inicial
 loadConversations();
 </script>
 

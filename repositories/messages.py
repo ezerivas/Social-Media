@@ -32,7 +32,7 @@ def save_message(conversation_id: int, sender: str, text: str):
         conn.close()
 
 
-# Obtener mensajes de una conversación
+# Obtener mensajes
 def get_messages_by_conversation(conversation_id: int):
     conn = get_connection()
     cur = conn.cursor()
@@ -50,16 +50,15 @@ def get_messages_by_conversation(conversation_id: int):
 
         rows = cur.fetchall()
 
-        result = []
-        for r in rows:
-            result.append({
+        return [
+            {
                 "id": r[0],
                 "sender": r[1],
                 "text": r[2],
                 "timestamp": r[3]
-            })
-
-        return result
+            }
+            for r in rows
+        ]
 
     finally:
         cur.close()

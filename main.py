@@ -1,60 +1,22 @@
-from fastapi import FastAPI, Request, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse, FileResponse
+import requests
 
 from config import VERIFY_TOKEN, PAGE_ACCESS_TOKEN
 from services.messaging import handle_incoming_message
 from repositories.conversations import get_all_conversations
-from repositories.messages import get_messages
-from ws_manager import connect, disconnect, send_to_room
-
-import requests
+from repositories.messages import get_messages_by_conversation
 
 app = FastAPI()
 
 
-def send_message(recipient_id, text):
-    url = "https://graph.facebook.com/v18.0/me/messages"
-
-    params = {"access_token": PAGE_ACCESS_TOKEN}
-
-    data = {
-        "recipient": {"id": recipient_id},
-        "message": {"text": text}
-    }
-
-    requests.post(url, params=params, json=data)
-
-
+# ---------- FRONT ----------
 @app.get("/")
 def home():
     return FileResponse("index.html")
 
 
-@app.websocket("/ws/{conversation_id}")
-async def websocket_endpoint(websocket: WebSocket, conversation_id: int):
-    await connect(websocket, conversation_id)
-
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        disconnect(websocket, conversation_id)
-
-
-@app.post("/send")
-async def send(data: dict):
-    recipient_id = data.get("recipient_id")
-    text = data.get("text")
-
-    send_message(recipient_id, text)
-
-    conv_id = handle_incoming_message(recipient_id, text, sender="agent")
-
-    await send_to_room(conv_id, {"type": "new_message"})
-
-    return {"status": "sent"}
-
-
+# ---------- WEBHOOK VERIFY ----------
 @app.get("/webhook")
 def verify(
     hub_mode: str = Query(None, alias="hub.mode"),
@@ -67,24 +29,45 @@ def verify(
     return PlainTextResponse("error")
 
 
+# ---------- WEBHOOK RECEIVE ----------
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
 
     for entry in data.get("entry", []):
         for messaging in entry.get("messaging", []):
+
             sender_id = messaging["sender"]["id"]
 
             if "message" in messaging:
                 text = messaging["message"].get("text")
 
-                conv_id = handle_incoming_message(sender_id, text, "user")
-
-                await send_to_room(conv_id, {"type": "new_message"})
+                handle_incoming_message(sender_id, text)
 
     return {"status": "ok"}
 
 
+# ---------- ENVIAR MENSAJE ----------
+@app.post("/send")
+async def send(data: dict):
+    recipient_id = data.get("recipient_id")
+    text = data.get("text")
+
+    url = "https://graph.facebook.com/v18.0/me/messages"
+
+    params = {"access_token": PAGE_ACCESS_TOKEN}
+
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": text}
+    }
+
+    requests.post(url, params=params, json=payload)
+
+    return {"status": "sent"}
+
+
+# ---------- API DASHBOARD ----------
 @app.get("/conversations")
 def conversations():
     return get_all_conversations()
@@ -92,4 +75,4 @@ def conversations():
 
 @app.get("/conversations/{conversation_id}/messages")
 def messages(conversation_id: int):
-    return get_messages(conversation_id)
+    return get_messages_by_conversation(conversation_id)
