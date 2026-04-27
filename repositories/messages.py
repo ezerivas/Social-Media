@@ -42,8 +42,8 @@ def get_messages_by_conversation(conversation_id: int):
     for row in rows:
         messages.append({
             "id": row[0],
-            "role": row[1],
-            "content": row[2],
+            "sender": row[1],
+            "text": row[2],
             "created_at": row[3]
         })
 

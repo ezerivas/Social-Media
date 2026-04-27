@@ -10,7 +10,6 @@ def handle_incoming_message(user_external_id: str, text: str):
 
     create_message(conversation[0], "user", text)
 
-    # respuesta dummy por ahora
     reply = "ok"
 
     create_message(conversation[0], "assistant", reply)

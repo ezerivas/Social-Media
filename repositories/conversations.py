@@ -1,33 +1,33 @@
 from database import get_connection
 
 
-def get_or_create_conversation(user_id: int, external_id: str = None):
+def get_or_create_conversation(user_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
-    if external_id:
-        cur.execute(
-            """
-            SELECT id, user_id, external_id, last_message_at
-            FROM conversations
-            WHERE external_id = %s
-            """,
-            (external_id,)
-        )
-        conversation = cur.fetchone()
+    cur.execute(
+        """
+        SELECT id, user_id, last_message_at
+        FROM conversations
+        WHERE user_id = %s
+        LIMIT 1
+        """,
+        (user_id,)
+    )
+    conversation = cur.fetchone()
 
-        if conversation:
-            cur.close()
-            conn.close()
-            return conversation
+    if conversation:
+        cur.close()
+        conn.close()
+        return conversation
 
     cur.execute(
         """
-        INSERT INTO conversations (user_id, external_id)
-        VALUES (%s, %s)
-        RETURNING id, user_id, external_id, last_message_at
+        INSERT INTO conversations (user_id)
+        VALUES (%s)
+        RETURNING id, user_id, last_message_at
         """,
-        (user_id, external_id)
+        (user_id,)
     )
 
     conversation = cur.fetchone()
@@ -63,7 +63,6 @@ def get_all_conversations():
     cur.execute("""
         SELECT
             c.id,
-            c.external_id,
             u.name,
             u.external_id,
             c.last_message_at
@@ -78,10 +77,9 @@ def get_all_conversations():
     for row in rows:
         conversations.append({
             "id": row[0],
-            "conversation_external_id": row[1],
-            "user_name": row[2],
-            "user_external_id": row[3],
-            "last_message_at": row[4]
+            "name": row[1],
+            "external_id": row[2],
+            "last_message_at": row[3]
         })
 
     cur.close()

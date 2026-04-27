@@ -36,12 +36,10 @@ async def webhook(request: Request):
 
     for entry in data.get("entry", []):
         for messaging in entry.get("messaging", []):
-
             sender_id = messaging["sender"]["id"]
 
             if "message" in messaging:
                 text = messaging["message"].get("text")
-
                 handle_incoming_message(sender_id, text)
 
     return {"status": "ok"}
@@ -54,7 +52,6 @@ async def send(data: dict):
     text = data.get("text")
 
     url = "https://graph.facebook.com/v18.0/me/messages"
-
     params = {"access_token": PAGE_ACCESS_TOKEN}
 
     payload = {
