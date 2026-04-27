@@ -1,34 +1,58 @@
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import PlainTextResponse
-from fastapi.responses import FileResponse
-
+from fastapi.responses import PlainTextResponse, FileResponse
 
 from config import VERIFY_TOKEN
 from database import engine, Base, SessionLocal
 from crud import save_message
-from database import SessionLocal
-from models import Conversation
-from models import Message
+from models import Conversation, Message, User
 
-import json
+import requests
+import os
 
 app = FastAPI()
 
+PAGE_ACCESS_TOKEN = os.getenv("PAGE_ACCESS_TOKEN")
 
+
+# 🔹 enviar mensaje a Facebook
+def send_message(recipient_id, text):
+    url = "https://graph.facebook.com/v18.0/me/messages"
+
+    params = {"access_token": PAGE_ACCESS_TOKEN}
+
+    data = {
+        "recipient": {"id": recipient_id},
+        "message": {"text": text}
+    }
+
+    response = requests.post(url, params=params, json=data)
+    print("SEND RESPONSE:", response.text)
+
+
+# 🔹 endpoint enviar mensaje
+@app.post("/send")
+async def send(data: dict):
+    recipient_id = data.get("recipient_id")
+    text = data.get("text")
+
+    send_message(recipient_id, text)
+
+    return {"status": "sent"}
+
+
+# 🔹 servir frontend
 @app.get("/")
 def home():
     return FileResponse("index.html")
 
+
+# 🔹 crear tablas
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
 
 
-@app.get("/")
-def home():
-    return {"status": "ok"}
-
-
+# 🔹 verificación webhook
 @app.get("/webhook")
 def verify(
     hub_mode: str = Query(None, alias="hub.mode"),
@@ -41,6 +65,7 @@ def verify(
     return PlainTextResponse("error")
 
 
+# 🔹 recibir mensajes
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
@@ -62,6 +87,7 @@ async def webhook(request: Request):
     return {"status": "ok"}
 
 
+# 🔹 listar conversaciones
 @app.get("/conversations")
 def get_conversations():
     db = SessionLocal()
@@ -70,13 +96,23 @@ def get_conversations():
         conversations = db.query(Conversation).all()
 
         result = []
+
         for c in conversations:
+            user = db.query(User).filter(User.id == c.user_id).first()
+
+            last_message = db.query(Message)\
+                .filter(Message.conversation_id == c.id)\
+                .order_by(Message.timestamp.desc())\
+                .first()
+
             result.append({
                 "id": c.id,
                 "user_id": c.user_id,
+                "external_id": user.external_id if user else None,
                 "canal": c.canal,
                 "estado": c.estado,
-                "last_message_at": c.last_message_at
+                "last_message_at": c.last_message_at,
+                "last_message": last_message.text if last_message else None
             })
 
         return result
@@ -85,6 +121,7 @@ def get_conversations():
         db.close()
 
 
+# 🔹 mensajes de una conversación
 @app.get("/conversations/{conversation_id}/messages")
 def get_messages(conversation_id: int):
     db = SessionLocal()
@@ -95,12 +132,13 @@ def get_messages(conversation_id: int):
         ).all()
 
         result = []
+
         for m in messages:
             result.append({
                 "id": m.id,
                 "sender": m.sender,
                 "text": m.text,
-                "timestamp": m.timestamp
+                "timestamp": m.timestamp.isoformat() if m.timestamp else None
             })
 
         return result
