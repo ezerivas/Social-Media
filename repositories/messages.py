@@ -1,65 +1,52 @@
-from database import get_connection
-from datetime import datetime
+from db import get_connection
 
-# Guardar mensaje
-def save_message(conversation_id: int, sender: str, text: str):
+
+def create_message(conversation_id: int, role: str, content: str):
     conn = get_connection()
     cur = conn.cursor()
 
-    try:
-        cur.execute(
-            """
-            INSERT INTO messages (conversation_id, sender, text, timestamp)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (conversation_id, sender, text, datetime.utcnow())
-        )
+    cur.execute(
+        """
+        INSERT INTO messages (conversation_id, role, content)
+        VALUES (%s, %s, %s)
+        RETURNING id, conversation_id, role, content, created_at
+        """,
+        (conversation_id, role, content)
+    )
 
-        # actualizar última actividad
-        cur.execute(
-            """
-            UPDATE conversations
-            SET last_message_at = %s
-            WHERE id = %s
-            """,
-            (datetime.utcnow(), conversation_id)
-        )
+    message = cur.fetchone()
+    conn.commit()
 
-        conn.commit()
-
-    finally:
-        cur.close()
-        conn.close()
+    cur.close()
+    conn.close()
+    return message
 
 
-# Obtener mensajes
 def get_messages_by_conversation(conversation_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
-    try:
-        cur.execute(
-            """
-            SELECT id, sender, text, timestamp
-            FROM messages
-            WHERE conversation_id = %s
-            ORDER BY timestamp ASC
-            """,
-            (conversation_id,)
-        )
+    cur.execute(
+        """
+        SELECT id, role, content, created_at
+        FROM messages
+        WHERE conversation_id = %s
+        ORDER BY created_at ASC
+        """,
+        (conversation_id,)
+    )
 
-        rows = cur.fetchall()
+    rows = cur.fetchall()
 
-        return [
-            {
-                "id": r[0],
-                "sender": r[1],
-                "text": r[2],
-                "timestamp": r[3]
-            }
-            for r in rows
-        ]
+    messages = []
+    for row in rows:
+        messages.append({
+            "id": row[0],
+            "role": row[1],
+            "content": row[2],
+            "created_at": row[3]
+        })
 
-    finally:
-        cur.close()
-        conn.close()
+    cur.close()
+    conn.close()
+    return messages

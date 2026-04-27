@@ -1,15 +1,20 @@
 from repositories.users import get_or_create_user
-from repositories.conversations import get_or_create_conversation
-from repositories.messages import save_message
+from repositories.conversations import get_or_create_conversation, update_last_message
+from repositories.messages import create_message
 
 
-# Maneja mensaje entrante
-def handle_incoming_message(sender_id: str, text: str, name: str = None):
+def handle_incoming_message(user_external_id: str, text: str):
+    user = get_or_create_user(user_external_id)
 
-    user_id = get_or_create_user(sender_id, name)
+    conversation = get_or_create_conversation(user[0])
 
-    conversation_id = get_or_create_conversation(user_id)
+    create_message(conversation[0], "user", text)
 
-    save_message(conversation_id, "user", text)
+    # respuesta dummy por ahora
+    reply = "ok"
 
-    return conversation_id
+    create_message(conversation[0], "assistant", reply)
+
+    update_last_message(conversation[0])
+
+    return reply
