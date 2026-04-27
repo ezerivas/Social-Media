@@ -1,6 +1,6 @@
 from database import get_connection
 
-# Crear usuario si no existe
+# Obtiene un usuario o lo crea si no existe
 def get_or_create_user(external_id: str, name: str = None):
     conn = get_connection()
     cur = conn.cursor()
@@ -16,7 +16,7 @@ def get_or_create_user(external_id: str, name: str = None):
         if user:
             return user[0]
 
-        # Crear nuevo usuario
+        # Crear usuario nuevo
         cur.execute(
             """
             INSERT INTO users (external_id, name)

@@ -15,7 +15,7 @@ def save_message(conversation_id: int, sender: str, text: str):
             (conversation_id, sender, text, datetime.utcnow())
         )
 
-        # actualizar última actividad de la conversación
+        # actualizar última actividad
         cur.execute(
             """
             UPDATE conversations

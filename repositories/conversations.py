@@ -1,12 +1,11 @@
 from database import get_connection
 
-# Obtener o crear conversación
+# Obtiene o crea conversación
 def get_or_create_conversation(user_id: int, canal: str = "facebook"):
     conn = get_connection()
     cur = conn.cursor()
 
     try:
-        # Buscar conversación existente
         cur.execute(
             """
             SELECT id FROM conversations
@@ -19,7 +18,6 @@ def get_or_create_conversation(user_id: int, canal: str = "facebook"):
         if conv:
             return conv[0]
 
-        # Crear nueva conversación
         cur.execute(
             """
             INSERT INTO conversations (user_id, canal, estado)
@@ -39,7 +37,7 @@ def get_or_create_conversation(user_id: int, canal: str = "facebook"):
         conn.close()
 
 
-# Obtener todas las conversaciones (tipo inbox)
+# Inbox de conversaciones
 def get_all_conversations():
     conn = get_connection()
     cur = conn.cursor()
@@ -54,10 +52,10 @@ def get_all_conversations():
                 c.estado,
                 c.last_message_at,
                 (
-                    SELECT text 
-                    FROM messages 
-                    WHERE conversation_id = c.id 
-                    ORDER BY timestamp DESC 
+                    SELECT text
+                    FROM messages
+                    WHERE conversation_id = c.id
+                    ORDER BY timestamp DESC
                     LIMIT 1
                 ) as last_message
             FROM conversations c
