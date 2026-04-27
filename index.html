@@ -1,119 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+  <meta charset="UTF-8">
   <title>Inbox</title>
-  <style>
-    body { font-family: Arial; display: flex; height: 100vh; margin: 0; }
-    #conversations { width: 30%; border-right: 1px solid #ccc; overflow-y: auto; }
-    #messages { width: 70%; display: flex; flex-direction: column; }
-    .conv { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
-    .conv:hover { background: #f0f0f0; }
-    #chat { flex: 1; padding: 10px; overflow-y: auto; }
-    #inputBox { display: flex; border-top: 1px solid #ccc; }
-    #msgInput { flex: 1; padding: 10px; border: none; }
-    button { padding: 10px; border: none; background: #007bff; color: white; }
-  </style>
 </head>
-
 <body>
 
-<div id="conversations"></div>
+<h2>Conversaciones</h2>
+<ul id="conversations"></ul>
 
-<div id="messages">
-  <div id="chat"></div>
+<hr>
 
-  <div id="inputBox">
-    <input id="msgInput" placeholder="Escribí un mensaje..." />
-    <button onclick="sendMessage()">Enviar</button>
-  </div>
-</div>
+<h2>Mensajes</h2>
+<ul id="messages"></ul>
+
+<input type="text" id="messageInput" placeholder="Escribí un mensaje">
+<button onclick="sendMessage()">Enviar</button>
 
 <script>
-const API = "https://social-media-production-0ef2.up.railway.app";
+let currentConversationId = null;
+let currentRecipientId = null;
+let ws = null;
 
-let currentConversation = null;
-let currentUserExternalId = null;
+
+// 🔹 abrir websocket por conversación (room)
+function openSocket(conversationId) {
+  if (ws) ws.close();
+
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${protocol}://${location.host}/ws/${conversationId}`);
+
+  ws.onmessage = () => {
+    loadMessages(); // actualizar mensajes en tiempo real
+  };
+}
 
 
 // 🔹 cargar conversaciones
 async function loadConversations() {
-  const res = await fetch(`${API}/conversations`);
+  const res = await fetch("/conversations");
   const data = await res.json();
 
-  const container = document.getElementById("conversations");
-  container.innerHTML = "";
+  const list = document.getElementById("conversations");
+  list.innerHTML = "";
 
-  data.forEach(c => {
-    const div = document.createElement("div");
-    div.className = "conv";
+  data.forEach(conv => {
+    const li = document.createElement("li");
 
-    div.innerHTML = `
-      <b>Usuario ${c.user_id}</b><br>
-      ${c.last_message || ""}
-    `;
+    // mostrar nombre del usuario
+    li.textContent = `${conv.name} (ID: ${conv.external_id})`;
 
-    div.onclick = () => {
-      currentConversation = c.id;
-      currentUserExternalId = c.external_id;
-      loadMessages(c.id);
+    // seleccionar conversación
+    li.onclick = () => {
+      currentConversationId = conv.id;
+      currentRecipientId = conv.external_id;
+
+      openSocket(conv.id); // 🔥 clave
+      loadMessages();
     };
 
-    container.appendChild(div);
+    list.appendChild(li);
   });
 }
 
 
 // 🔹 cargar mensajes
-async function loadMessages(id) {
-  const res = await fetch(`${API}/conversations/${id}/messages`);
+async function loadMessages() {
+  if (!currentConversationId) return;
+
+  const res = await fetch(`/conversations/${currentConversationId}/messages`);
   const data = await res.json();
 
-  const container = document.getElementById("chat");
-  container.innerHTML = "";
+  const list = document.getElementById("messages");
+  list.innerHTML = "";
 
-  data.forEach(m => {
-    const div = document.createElement("div");
+  data.forEach(msg => {
+    const li = document.createElement("li");
 
-    div.innerHTML = `<b>${m.sender === "agent" ? "Yo" : "Cliente"}:</b> ${m.text}`;
+    li.textContent = `[${msg.sender}] ${msg.text}`;
 
-    container.appendChild(div);
+    list.appendChild(li);
   });
-
-  container.scrollTop = container.scrollHeight;
 }
 
 
 // 🔹 enviar mensaje
 async function sendMessage() {
-  const input = document.getElementById("msgInput");
+  const input = document.getElementById("messageInput");
   const text = input.value;
 
-  if (!text || !currentUserExternalId) return;
+  if (!text || !currentRecipientId) return;
 
-  await fetch(`${API}/send`, {
+  await fetch("/send", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
-      recipient_id: currentUserExternalId,
-      text
+      recipient_id: currentRecipientId,
+      text: text
     })
   });
 
   input.value = "";
 
-  loadMessages(currentConversation);
+  loadMessages(); // actualización inmediata
 }
 
 
-// 🔹 auto refresh
-setInterval(() => {
-  if (currentConversation) {
-    loadMessages(currentConversation);
-  }
-}, 3000);
-
-
-// init
+// 🔹 carga inicial
 loadConversations();
 </script>
 

@@ -1,16 +1,20 @@
 import requests
 from config import PAGE_ACCESS_TOKEN
 
-def enviar_mensaje(user_id, texto):
-    url = "https://graph.facebook.com/v19.0/me/messages"
+# obtener nombre del usuario desde Facebook
+def get_user_name(psid: str):
+    url = f"https://graph.facebook.com/{psid}"
 
-    response = requests.post(
-        url,
-        params={"access_token": PAGE_ACCESS_TOKEN},
-        json={
-            "recipient": {"id": user_id},
-            "message": {"text": texto}
-        }
-    )
+    params = {
+        "fields": "name",
+        "access_token": PAGE_ACCESS_TOKEN
+    }
 
-    return response.json()
+    try:
+        res = requests.get(url, params=params)
+        data = res.json()
+
+        return data.get("name", "Usuario")
+    except Exception as e:
+        print("ERROR META:", e)
+        return "Usuario"
