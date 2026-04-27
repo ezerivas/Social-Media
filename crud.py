@@ -1,9 +1,9 @@
-from sqlalchemy.orm import Session
 from models import User, Conversation, Message
 from datetime import datetime
 
 
-def save_message(db: Session, sender_id: str, text: str):
+def save_message(db, sender_id: str, text: str, sender="user"):
+    # buscar usuario
     user = db.query(User).filter(User.external_id == sender_id).first()
 
     if not user:
@@ -12,7 +12,10 @@ def save_message(db: Session, sender_id: str, text: str):
         db.commit()
         db.refresh(user)
 
-    conv = db.query(Conversation).filter(Conversation.user_id == user.id).first()
+    # buscar conversación
+    conv = db.query(Conversation).filter(
+        Conversation.user_id == user.id
+    ).first()
 
     if not conv:
         conv = Conversation(user_id=user.id, canal="facebook")
@@ -20,9 +23,10 @@ def save_message(db: Session, sender_id: str, text: str):
         db.commit()
         db.refresh(conv)
 
+    # guardar mensaje
     message = Message(
         conversation_id=conv.id,
-        sender="user",
+        sender=sender,
         text=text
     )
 

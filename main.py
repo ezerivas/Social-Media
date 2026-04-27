@@ -35,7 +35,18 @@ async def send(data: dict):
     recipient_id = data.get("recipient_id")
     text = data.get("text")
 
+    if not recipient_id or not text:
+        return {"error": "faltan datos"}
+
+    # enviar a Facebook
     send_message(recipient_id, text)
+
+    # guardar en DB como agente
+    db = SessionLocal()
+    try:
+        save_message(db, recipient_id, text, sender="agent")
+    finally:
+        db.close()
 
     return {"status": "sent"}
 
@@ -80,7 +91,7 @@ async def webhook(request: Request):
 
                 db = SessionLocal()
                 try:
-                    save_message(db, sender_id, text)
+                    save_message(db, sender_id, text, sender="user")
                 finally:
                     db.close()
 
@@ -93,7 +104,9 @@ def get_conversations():
     db = SessionLocal()
 
     try:
-        conversations = db.query(Conversation).all()
+        conversations = db.query(Conversation)\
+            .order_by(Conversation.last_message_at.desc())\
+            .all()
 
         result = []
 
@@ -127,9 +140,10 @@ def get_messages(conversation_id: int):
     db = SessionLocal()
 
     try:
-        messages = db.query(Message).filter(
-            Message.conversation_id == conversation_id
-        ).all()
+        messages = db.query(Message)\
+            .filter(Message.conversation_id == conversation_id)\
+            .order_by(Message.timestamp.asc())\
+            .all()
 
         result = []
 

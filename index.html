@@ -2,65 +2,16 @@
 <html>
 <head>
   <title>Inbox</title>
-
   <style>
-    body {
-      font-family: Arial;
-      display: flex;
-      height: 100vh;
-      margin: 0;
-    }
-
-    #conversations {
-      width: 30%;
-      border-right: 1px solid #ccc;
-      overflow-y: auto;
-    }
-
-    #messages {
-      width: 70%;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .conv {
-      padding: 10px;
-      border-bottom: 1px solid #eee;
-      cursor: pointer;
-    }
-
-    .conv:hover {
-      background: #f0f0f0;
-    }
-
-    #chat {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-    }
-
-    #inputBox {
-      display: flex;
-      border-top: 1px solid #ccc;
-    }
-
-    #msgInput {
-      flex: 1;
-      padding: 10px;
-      border: none;
-    }
-
-    button {
-      padding: 10px;
-      border: none;
-      background: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
+    body { font-family: Arial; display: flex; height: 100vh; margin: 0; }
+    #conversations { width: 30%; border-right: 1px solid #ccc; overflow-y: auto; }
+    #messages { width: 70%; display: flex; flex-direction: column; }
+    .conv { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .conv:hover { background: #f0f0f0; }
+    #chat { flex: 1; padding: 10px; overflow-y: auto; }
+    #inputBox { display: flex; border-top: 1px solid #ccc; }
+    #msgInput { flex: 1; padding: 10px; border: none; }
+    button { padding: 10px; border: none; background: #007bff; color: white; }
   </style>
 </head>
 
@@ -78,10 +29,11 @@
 </div>
 
 <script>
-const API = "https://social-media-production-0ef2.up.railway.app"; // ⚠️ CAMBIAR
+const API = "https://TU-APP.up.railway.app";
 
 let currentConversation = null;
-let currentUserId = null;
+let currentUserExternalId = null;
+
 
 // 🔹 cargar conversaciones
 async function loadConversations() {
@@ -102,13 +54,14 @@ async function loadConversations() {
 
     div.onclick = () => {
       currentConversation = c.id;
-      currentUserId = c.user_id;
+      currentUserExternalId = c.external_id;
       loadMessages(c.id);
     };
 
     container.appendChild(div);
   });
 }
+
 
 // 🔹 cargar mensajes
 async function loadMessages(id) {
@@ -121,7 +74,7 @@ async function loadMessages(id) {
   data.forEach(m => {
     const div = document.createElement("div");
 
-    div.innerHTML = `<b>${m.sender}:</b> ${m.text}`;
+    div.innerHTML = `<b>${m.sender === "agent" ? "Yo" : "Cliente"}:</b> ${m.text}`;
 
     container.appendChild(div);
   });
@@ -129,30 +82,19 @@ async function loadMessages(id) {
   container.scrollTop = container.scrollHeight;
 }
 
+
 // 🔹 enviar mensaje
 async function sendMessage() {
   const input = document.getElementById("msgInput");
   const text = input.value;
 
-  if (!text || !currentConversation) return;
-
-  // 🔥 buscamos el external_id del usuario
-  const res = await fetch(`${API}/conversations`);
-  const conversations = await res.json();
-
-  const conv = conversations.find(c => c.id === currentConversation);
-
-  if (!conv) return;
-
-  const recipient_id = conv.external_id; // 👈 esto lo vamos a necesitar del backend
+  if (!text || !currentUserExternalId) return;
 
   await fetch(`${API}/send`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      recipient_id,
+      recipient_id: currentUserExternalId,
       text
     })
   });
@@ -162,9 +104,18 @@ async function sendMessage() {
   loadMessages(currentConversation);
 }
 
+
+// 🔹 auto refresh
+setInterval(() => {
+  if (currentConversation) {
+    loadMessages(currentConversation);
+  }
+}, 3000);
+
+
 // init
 loadConversations();
 </script>
 
 </body>
-</html>>
+</html>
