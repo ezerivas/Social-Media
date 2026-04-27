@@ -1,4 +1,4 @@
-from db import get_connection
+from database import get_connection
 
 
 def get_or_create_conversation(user_id: int, external_id: str = None):

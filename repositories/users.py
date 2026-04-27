@@ -1,4 +1,4 @@
-from db import get_connection
+from database import get_connection
 
 
 def get_user_by_external_id(external_id: str):
