@@ -1,47 +1,66 @@
 from database import get_connection
+from datetime import datetime
 
-def insert_message(conversation_id, sender, text):
+# Guardar mensaje
+def save_message(conversation_id: int, sender: str, text: str):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO messages (conversation_id, sender, text)
-        VALUES (%s, %s, %s)
-    """, (conversation_id, sender, text))
+    try:
+        cur.execute(
+            """
+            INSERT INTO messages (conversation_id, sender, text, timestamp)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (conversation_id, sender, text, datetime.utcnow())
+        )
 
-    cur.execute("""
-        UPDATE conversations
-        SET last_message_at = NOW()
-        WHERE id = %s
-    """, (conversation_id,))
+        # actualizar última actividad de la conversación
+        cur.execute(
+            """
+            UPDATE conversations
+            SET last_message_at = %s
+            WHERE id = %s
+            """,
+            (datetime.utcnow(), conversation_id)
+        )
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+
+    finally:
+        cur.close()
+        conn.close()
 
 
-def get_messages(conversation_id):
+# Obtener mensajes de una conversación
+def get_messages_by_conversation(conversation_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT id, sender, text, timestamp
-        FROM messages
-        WHERE conversation_id = %s
-        ORDER BY timestamp ASC
-    """, (conversation_id,))
+    try:
+        cur.execute(
+            """
+            SELECT id, sender, text, timestamp
+            FROM messages
+            WHERE conversation_id = %s
+            ORDER BY timestamp ASC
+            """,
+            (conversation_id,)
+        )
 
-    rows = cur.fetchall()
+        rows = cur.fetchall()
 
-    cur.close()
-    conn.close()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r[0],
+                "sender": r[1],
+                "text": r[2],
+                "timestamp": r[3]
+            })
 
-    return [
-        {
-            "id": r[0],
-            "sender": r[1],
-            "text": r[2],
-            "timestamp": r[3].isoformat() if r[3] else None
-        }
-        for r in rows
-    ]
+        return result
+
+    finally:
+        cur.close()
+        conn.close()

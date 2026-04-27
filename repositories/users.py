@@ -1,44 +1,36 @@
 from database import get_connection
 
-def get_user_by_external_id(external_id):
+# Crear usuario si no existe
+def get_or_create_user(external_id: str, name: str = None):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT id, external_id, name
-        FROM users
-        WHERE external_id = %s
-    """, (external_id,))
+    try:
+        # Buscar usuario existente
+        cur.execute(
+            "SELECT id FROM users WHERE external_id = %s",
+            (external_id,)
+        )
+        user = cur.fetchone()
 
-    row = cur.fetchone()
+        if user:
+            return user[0]
 
-    cur.close()
-    conn.close()
+        # Crear nuevo usuario
+        cur.execute(
+            """
+            INSERT INTO users (external_id, name)
+            VALUES (%s, %s)
+            RETURNING id
+            """,
+            (external_id, name)
+        )
 
-    if row:
-        return {
-            "id": row[0],
-            "external_id": row[1],
-            "name": row[2]
-        }
+        user_id = cur.fetchone()[0]
+        conn.commit()
 
-    return None
+        return user_id
 
-
-def create_user(external_id, name):
-    conn = get_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO users (external_id, name)
-        VALUES (%s, %s)
-        RETURNING id
-    """, (external_id, name))
-
-    user_id = cur.fetchone()[0]
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-    return {"id": user_id, "external_id": external_id, "name": name}
+    finally:
+        cur.close()
+        conn.close()
