@@ -6,14 +6,9 @@ def get_or_create_conversation(user_id: int, external_id: str):
     cur = conn.cursor()
 
     cur.execute(
-        """
-        SELECT id, user_id, external_id, last_message_at
-        FROM conversations
-        WHERE external_id = %s
-        """,
+        "SELECT id, user_id, external_id FROM conversations WHERE external_id = %s",
         (external_id,)
     )
-
     conversation = cur.fetchone()
 
     if conversation:
@@ -25,7 +20,7 @@ def get_or_create_conversation(user_id: int, external_id: str):
         """
         INSERT INTO conversations (user_id, external_id)
         VALUES (%s, %s)
-        RETURNING id, user_id, external_id, last_message_at
+        RETURNING id, user_id, external_id
         """,
         (user_id, external_id)
     )
