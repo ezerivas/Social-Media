@@ -7,6 +7,7 @@ from config import VERIFY_TOKEN, PAGE_ACCESS_TOKEN
 from services.messaging import handle_incoming_message
 from repositories.conversations import get_all_conversations, update_last_message
 from repositories.messages import get_messages_by_conversation, create_message
+from database import get_connection
 from ws_manager import connect, disconnect, send_to_room
 
 app = FastAPI()
@@ -43,10 +44,10 @@ async def webhook(request: Request):
             if "message" in messaging:
                 text = messaging["message"].get("text")
 
-                # guarda en DB
+                # guardar en DB
                 conversation_id = handle_incoming_message(sender_id, text)
 
-                # enviar en vivo por WS
+                # enviar en vivo al dashboard
                 await send_to_room(conversation_id, {
                     "role": "user",
                     "content": text
@@ -66,52 +67,51 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
             msg = json.loads(data)
 
             if msg.get("type") == "message":
-            text = msg.get("text")
+                text = msg.get("text")
 
-            # guardar en DB
-            message = create_message(conversation_id, "assistant", text)
+                # Guardar en DB
+                message = create_message(conversation_id, "assistant", text)
 
-            # actualizar conversación
-            update_last_message(conversation_id)
+                # Actualizar conversación
+                update_last_message(conversation_id)
 
-            # 🔥 ENVIAR A FACEBOOK
-            # necesitamos el external_id del usuario
-            from database import get_connection
+                # Obtener external_id del usuario
+                conn = get_connection()
+                cur = conn.cursor()
 
-            conn = get_connection()
-            cur = conn.cursor()
+                cur.execute("""
+                    SELECT u.external_id
+                    FROM conversations c
+                    JOIN users u ON u.id = c.user_id
+                    WHERE c.id = %s
+                """, (conversation_id,))
 
-            cur.execute("""
-                SELECT u.external_id
-                FROM conversations c
-                JOIN users u ON u.id = c.user_id
-                WHERE c.id = %s
-            """, (conversation_id,))
+                result = cur.fetchone()
 
-            result = cur.fetchone()
-            cur.close()
-            conn.close()
+                cur.close()
+                conn.close()
 
-            if result:
-                recipient_id = result[0]
+                # Enviar mensaje a Facebook
+                if result:
+                    recipient_id = result[0]
 
-                url = "https://graph.facebook.com/v18.0/me/messages"
-                params = {"access_token": PAGE_ACCESS_TOKEN}
+                    url = "https://graph.facebook.com/v18.0/me/messages"
+                    params = {"access_token": PAGE_ACCESS_TOKEN}
 
-                payload = {
-                    "recipient": {"id": recipient_id},
-                    "message": {"text": text}
-                }
+                    payload = {
+                        "recipient": {"id": recipient_id},
+                        "message": {"text": text}
+                    }
 
-                requests.post(url, params=params, json=payload)
+                    requests.post(url, params=params, json=payload)
 
-            # enviar a todos los clientes (dashboard)
-            await send_to_room(conversation_id, {
-                "id": message[0],
-                "role": message[2],
-                "content": message[3],
-                "created_at": str(message[4])
-            })
+                # Enviar a todos los clientes conectados
+                await send_to_room(conversation_id, {
+                    "id": message[0],
+                    "role": message[2],
+                    "content": message[3],
+                    "created_at": str(message[4])
+                })
 
     except WebSocketDisconnect:
         disconnect(ws, conversation_id)
