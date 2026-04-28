@@ -17,6 +17,7 @@
 <script>
 let currentConversation = null;
 let currentUser = null;
+let currentChannel = null;
 let ws = null;
 
 
@@ -32,11 +33,15 @@ async function loadConversations() {
 
     data.forEach(c => {
         const li = document.createElement('li');
-        li.innerText = c.user_name || c.user_external_id;
+
+        // 🔥 mostramos canal + usuario
+        li.innerText = `[${c.channel}] ${c.user_name || c.user_external_id}`;
 
         li.onclick = () => {
             currentConversation = c.id;
             currentUser = c.user_external_id;
+            currentChannel = c.channel;
+
             loadMessages();
         };
 
@@ -59,7 +64,7 @@ async function loadMessages() {
         list.appendChild(li);
     });
 
-    // conectar WS
+    // 🔥 conectar WS
     if (ws) ws.close();
     connectWS();
 }
@@ -68,10 +73,6 @@ async function loadMessages() {
 // ---------- WEBSOCKET ----------
 function connectWS() {
     ws = new WebSocket(`wss://${location.host}/ws/${currentConversation}`);
-
-    ws.onopen = () => {
-        console.log("WS conectado ✅");
-    };
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
@@ -83,14 +84,6 @@ function connectWS() {
 
         list.appendChild(li);
     };
-
-    ws.onerror = (err) => {
-        console.error("WS error", err);
-    };
-
-    ws.onclose = () => {
-        console.log("WS cerrado");
-    };
 }
 
 
@@ -98,14 +91,15 @@ function connectWS() {
 function sendMessage() {
     const text = document.getElementById('text').value;
 
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        alert("WebSocket no conectado todavía");
+    if (!ws) {
+        alert("Seleccioná una conversación primero");
         return;
     }
 
     ws.send(JSON.stringify({
         type: "message",
-        text: text
+        text: text,
+        channel: currentChannel // 🔥 importante para router futuro
     }));
 
     document.getElementById('text').value = '';

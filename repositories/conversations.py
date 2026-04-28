@@ -1,36 +1,39 @@
-from database import get_connection
+from app.database import get_connection
 
 
-def get_or_create_conversation(user_id: int, external_id: str):
+def get_or_create_conversation(tenant_id: int, user_id: int, channel: str):
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT id, user_id, external_id FROM conversations WHERE external_id = %s",
-        (external_id,)
+        """
+        SELECT id FROM conversations
+        WHERE tenant_id = %s AND user_id = %s AND channel = %s
+        """,
+        (tenant_id, user_id, channel),
     )
-    conversation = cur.fetchone()
+    conv = cur.fetchone()
 
-    if conversation:
+    if conv:
         cur.close()
         conn.close()
-        return conversation
+        return conv[0]
 
     cur.execute(
         """
-        INSERT INTO conversations (user_id, external_id)
-        VALUES (%s, %s)
-        RETURNING id, user_id, external_id
+        INSERT INTO conversations (tenant_id, user_id, channel)
+        VALUES (%s, %s, %s)
+        RETURNING id
         """,
-        (user_id, external_id)
+        (tenant_id, user_id, channel),
     )
 
-    conversation = cur.fetchone()
+    conv_id = cur.fetchone()[0]
     conn.commit()
 
     cur.close()
     conn.close()
-    return conversation
+    return conv_id
 
 
 def update_last_message(conversation_id: int):
@@ -38,12 +41,8 @@ def update_last_message(conversation_id: int):
     cur = conn.cursor()
 
     cur.execute(
-        """
-        UPDATE conversations
-        SET last_message_at = NOW()
-        WHERE id = %s
-        """,
-        (conversation_id,)
+        "UPDATE conversations SET last_message_at = NOW() WHERE id = %s",
+        (conversation_id,),
     )
 
     conn.commit()
@@ -51,32 +50,32 @@ def update_last_message(conversation_id: int):
     conn.close()
 
 
-def get_all_conversations():
+def get_all_conversations(tenant_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT
-            c.id,
-            u.name,
-            u.external_id,
-            c.last_message_at
+    cur.execute(
+        """
+        SELECT c.id, u.external_id, c.channel, c.last_message_at
         FROM conversations c
         JOIN users u ON u.id = c.user_id
-        ORDER BY c.last_message_at DESC NULLS LAST
-    """)
+        WHERE c.tenant_id = %s
+        ORDER BY c.last_message_at DESC
+        """,
+        (tenant_id,),
+    )
 
     rows = cur.fetchall()
 
-    conversations = []
-    for row in rows:
-        conversations.append({
-            "id": row[0],
-            "user_name": row[1],
-            "user_external_id": row[2],
-            "last_message_at": row[3]
-        })
-
     cur.close()
     conn.close()
-    return conversations
+
+    return [
+        {
+            "id": r[0],
+            "user_external_id": r[1],
+            "channel": r[2],
+            "last_message_at": r[3],
+        }
+        for r in rows
+    ]

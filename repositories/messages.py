@@ -1,4 +1,4 @@
-from database import get_connection
+from app.database import get_connection
 
 
 def create_message(conversation_id: int, role: str, content: str):
@@ -9,44 +9,38 @@ def create_message(conversation_id: int, role: str, content: str):
         """
         INSERT INTO messages (conversation_id, role, content)
         VALUES (%s, %s, %s)
-        RETURNING id, conversation_id, role, content, created_at
+        RETURNING id, role, content, created_at
         """,
-        (conversation_id, role, content)
+        (conversation_id, role, content),
     )
 
-    message = cur.fetchone()
+    msg = cur.fetchone()
     conn.commit()
 
     cur.close()
     conn.close()
-    return message
+    return msg
 
 
-def get_messages_by_conversation(conversation_id: int):
+def get_messages(conversation_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute(
         """
-        SELECT id, role, content, created_at
+        SELECT role, content, created_at
         FROM messages
         WHERE conversation_id = %s
         ORDER BY created_at ASC
         """,
-        (conversation_id,)
+        (conversation_id,),
     )
 
     rows = cur.fetchall()
 
-    messages = []
-    for row in rows:
-        messages.append({
-            "id": row[0],
-            "role": row[1],
-            "content": row[2],
-            "created_at": row[3]
-        })
-
     cur.close()
     conn.close()
-    return messages
+
+    return [
+        {"role": r[0], "content": r[1], "created_at": r[2]} for r in rows
+    ]

@@ -1,32 +1,28 @@
-from database import get_connection
+from app.database import get_connection
 
 
-def get_user_by_external_id(external_id: str):
+def get_or_create_user(tenant_id: int, external_id: str):
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT id, external_id, name FROM users WHERE external_id = %s",
-        (external_id,)
+        "SELECT id FROM users WHERE tenant_id = %s AND external_id = %s",
+        (tenant_id, external_id),
     )
     user = cur.fetchone()
 
-    cur.close()
-    conn.close()
-    return user
-
-
-def create_user(external_id: str, name: str = None):
-    conn = get_connection()
-    cur = conn.cursor()
+    if user:
+        cur.close()
+        conn.close()
+        return user
 
     cur.execute(
         """
-        INSERT INTO users (external_id, name)
+        INSERT INTO users (tenant_id, external_id)
         VALUES (%s, %s)
-        RETURNING id, external_id, name
+        RETURNING id
         """,
-        (external_id, name)
+        (tenant_id, external_id),
     )
 
     user = cur.fetchone()
@@ -35,12 +31,3 @@ def create_user(external_id: str, name: str = None):
     cur.close()
     conn.close()
     return user
-
-
-def get_or_create_user(external_id: str, name: str = None):
-    user = get_user_by_external_id(external_id)
-
-    if user:
-        return user
-
-    return create_user(external_id, name)
