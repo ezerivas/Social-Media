@@ -1,12 +1,3 @@
-import sys
-import os
-
-# Esto asegura que la raíz del proyecto esté en el path de Python
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Ahora tus imports deberían funcionar
-from ws.manager import tu_funcion_o_clase
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
