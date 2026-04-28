@@ -24,7 +24,7 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
     await connect(ws, conversation_id)
     try:
         while True:
-            await ws.receive_text()
+            await websocket.receive_text()
     except WebSocketDisconnect:
         disconnect(ws, conversation_id)
 
