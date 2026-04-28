@@ -66,21 +66,52 @@ async def websocket_endpoint(ws: WebSocket, conversation_id: int):
             msg = json.loads(data)
 
             if msg.get("type") == "message":
-                text = msg.get("text")
+            text = msg.get("text")
 
-                # guardar en DB
-                message = create_message(conversation_id, "assistant", text)
+            # guardar en DB
+            message = create_message(conversation_id, "assistant", text)
 
-                # actualizar conversación
-                update_last_message(conversation_id)
+            # actualizar conversación
+            update_last_message(conversation_id)
 
-                # enviar a todos los clientes
-                await send_to_room(conversation_id, {
-                    "id": message[0],
-                    "role": message[2],
-                    "content": message[3],
-                    "created_at": str(message[4])
-                })
+            # 🔥 ENVIAR A FACEBOOK
+            # necesitamos el external_id del usuario
+            from database import get_connection
+
+            conn = get_connection()
+            cur = conn.cursor()
+
+            cur.execute("""
+                SELECT u.external_id
+                FROM conversations c
+                JOIN users u ON u.id = c.user_id
+                WHERE c.id = %s
+            """, (conversation_id,))
+
+            result = cur.fetchone()
+            cur.close()
+            conn.close()
+
+            if result:
+                recipient_id = result[0]
+
+                url = "https://graph.facebook.com/v18.0/me/messages"
+                params = {"access_token": PAGE_ACCESS_TOKEN}
+
+                payload = {
+                    "recipient": {"id": recipient_id},
+                    "message": {"text": text}
+                }
+
+                requests.post(url, params=params, json=payload)
+
+            # enviar a todos los clientes (dashboard)
+            await send_to_room(conversation_id, {
+                "id": message[0],
+                "role": message[2],
+                "content": message[3],
+                "created_at": str(message[4])
+            })
 
     except WebSocketDisconnect:
         disconnect(ws, conversation_id)
