@@ -2,7 +2,6 @@ from fastapi import WebSocket
 
 rooms = {}
 
-
 async def connect(ws: WebSocket, conversation_id: int):
     await ws.accept()
 
