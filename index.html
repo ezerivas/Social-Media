@@ -19,11 +19,15 @@ let currentConversation = null;
 let currentUser = null;
 let ws = null;
 
+
+// ---------- CONVERSACIONES ----------
 async function loadConversations() {
     const res = await fetch('/conversations');
     const data = await res.json();
 
     const list = document.getElementById('conversations');
+    if (!list) return;
+
     list.innerHTML = '';
 
     data.forEach(c => {
@@ -33,8 +37,6 @@ async function loadConversations() {
         li.onclick = () => {
             currentConversation = c.id;
             currentUser = c.user_external_id;
-
-            connectWebSocket();
             loadMessages();
         };
 
@@ -42,26 +44,9 @@ async function loadConversations() {
     });
 }
 
-function connectWebSocket() {
-    if (ws) {
-        ws.close();
-    }
 
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${protocol}://${location.host}/ws/${currentConversation}`);
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
-        if (data.type === "new_message") {
-            loadMessages();
-        }
-    };
-}
-
+// ---------- MENSAJES ----------
 async function loadMessages() {
-    if (!currentConversation) return;
-
     const res = await fetch(`/conversations/${currentConversation}/messages`);
     const data = await res.json();
 
@@ -73,27 +58,50 @@ async function loadMessages() {
         li.innerText = `${m.role}: ${m.content}`;
         list.appendChild(li);
     });
+
+    // 🔥 conectar WS
+    if (ws) ws.close();
+    connectWS();
 }
 
-async function sendMessage() {
-    const textInput = document.getElementById('text');
-    const text = textInput.value;
 
-    if (!text || !currentConversation) return;
+// ---------- WEBSOCKET ----------
+function connectWS() {
+    ws = new WebSocket(`wss://${location.host}/ws/${currentConversation}`);
 
-    await fetch('/send', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            recipient_id: currentUser,
-            text: text,
-            conversation_id: currentConversation
-        })
-    });
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
 
-    textInput.value = '';
+        const list = document.getElementById('messages');
+
+        const li = document.createElement('li');
+        li.innerText = `${msg.role}: ${msg.content}`;
+
+        list.appendChild(li);
+    };
 }
 
+
+// ---------- ENVIAR ----------
+function sendMessage() {
+    const text = document.getElementById('text').value;
+
+    if (!ws) {
+        alert("Seleccioná una conversación primero");
+        return;
+    }
+
+    ws.send(JSON.stringify({
+        type: "message",
+        text: text
+    }));
+
+    document.getElementById('text').value = '';
+}
+
+
+// ---------- AUTO REFRESH ----------
+setInterval(loadConversations, 3000);
 loadConversations();
 </script>
 

@@ -2,7 +2,6 @@ from fastapi import WebSocket
 
 rooms: dict[int, list[WebSocket]] = {}
 
-
 async def connect(websocket: WebSocket, conversation_id: int):
     await websocket.accept()
 
@@ -14,8 +13,7 @@ async def connect(websocket: WebSocket, conversation_id: int):
 
 def disconnect(websocket: WebSocket, conversation_id: int):
     if conversation_id in rooms:
-        if websocket in rooms[conversation_id]:
-            rooms[conversation_id].remove(websocket)
+        rooms[conversation_id].remove(websocket)
 
 
 async def send_to_room(conversation_id: int, message: dict):
