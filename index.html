@@ -1,114 +1,72 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Dashboard</title>
-</head>
 <body>
 
-<h2>Conversaciones</h2>
 <ul id="conversations"></ul>
-
-<h2>Mensajes</h2>
 <ul id="messages"></ul>
 
-<input id="text" placeholder="Escribir mensaje">
-<button onclick="sendMessage()">Enviar</button>
+<input id="text">
+<button onclick="send()">send</button>
 
 <script>
-let currentConversation = null;
-let currentUser = null;
-let currentChannel = null;
-let ws = null;
+let ws = null
+let current = null
 
+async function load() {
+    const res = await fetch('/conversations')
+    const data = await res.json()
 
-// ---------- CONVERSACIONES ----------
-async function loadConversations() {
-    const res = await fetch('/conversations');
-    const data = await res.json();
-
-    const list = document.getElementById('conversations');
-    if (!list) return;
-
-    list.innerHTML = '';
+    const ul = document.getElementById('conversations')
+    ul.innerHTML = ''
 
     data.forEach(c => {
-        const li = document.createElement('li');
+        const li = document.createElement('li')
+        li.innerText = c.user_external_id
 
-        // 🔥 mostramos canal + usuario
-        li.innerText = `[${c.channel}] ${c.user_name || c.user_external_id}`;
-
-        li.onclick = () => {
-            currentConversation = c.id;
-            currentUser = c.user_external_id;
-            currentChannel = c.channel;
-
-            loadMessages();
-        };
-
-        list.appendChild(li);
-    });
+        li.onclick = () => openConv(c.id)
+        ul.appendChild(li)
+    })
 }
 
+async function openConv(id) {
+    current = id
 
-// ---------- MENSAJES ----------
-async function loadMessages() {
-    const res = await fetch(`/conversations/${currentConversation}/messages`);
-    const data = await res.json();
+    const res = await fetch(`/conversations/${id}/messages`)
+    const data = await res.json()
 
-    const list = document.getElementById('messages');
-    list.innerHTML = '';
+    const ul = document.getElementById('messages')
+    ul.innerHTML = ''
 
     data.forEach(m => {
-        const li = document.createElement('li');
-        li.innerText = `${m.role}: ${m.content}`;
-        list.appendChild(li);
-    });
+        const li = document.createElement('li')
+        li.innerText = m.role + ": " + m.content
+        ul.appendChild(li)
+    })
 
-    // 🔥 conectar WS
-    if (ws) ws.close();
-    connectWS();
-}
+    if (ws) ws.close()
 
+    ws = new WebSocket(`wss://${location.host}/ws/${id}`)
 
-// ---------- WEBSOCKET ----------
-function connectWS() {
-    ws = new WebSocket(`wss://${location.host}/ws/${currentConversation}`);
+    ws.onmessage = e => {
+        const m = JSON.parse(e.data)
 
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
+        const li = document.createElement('li')
+        li.innerText = m.role + ": " + m.content
 
-        const list = document.getElementById('messages');
-
-        const li = document.createElement('li');
-        li.innerText = `${msg.role}: ${msg.content}`;
-
-        list.appendChild(li);
-    };
-}
-
-
-// ---------- ENVIAR ----------
-function sendMessage() {
-    const text = document.getElementById('text').value;
-
-    if (!ws) {
-        alert("Seleccioná una conversación primero");
-        return;
+        document.getElementById('messages').appendChild(li)
     }
+}
+
+function send() {
+    const text = document.getElementById('text').value
 
     ws.send(JSON.stringify({
         type: "message",
-        text: text,
-        channel: currentChannel // 🔥 importante para router futuro
-    }));
-
-    document.getElementById('text').value = '';
+        text: text
+    }))
 }
 
-
-// ---------- AUTO REFRESH ----------
-setInterval(loadConversations, 3000);
-loadConversations();
+load()
 </script>
 
 </body>

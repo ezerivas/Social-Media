@@ -1,15 +1,16 @@
-from services import facebook, instagram, whatsapp
+from channels.facebook import FacebookChannel
+from channels.instagram import InstagramChannel
+from channels.whatsapp import WhatsAppChannel
 
 
-def send_message(channel: str, config: dict, recipient_id: str, text: str):
+def get_driver(channel: str):
     if channel == "facebook":
-        return facebook.send(config, recipient_id, text)
+        return FacebookChannel()
 
-    elif channel == "instagram":
-        return instagram.send(config, recipient_id, text)
+    if channel == "instagram":
+        return InstagramChannel()
 
-    elif channel == "whatsapp":
-        return whatsapp.send(config, recipient_id, text)
+    if channel == "whatsapp":
+        return WhatsAppChannel()
 
-    else:
-        raise ValueError(f"Unsupported channel: {channel}")
+    raise ValueError("unsupported channel")

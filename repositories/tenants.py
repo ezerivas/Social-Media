@@ -1,13 +1,24 @@
-from app.database import get_connection
+from database import get_connection
 
 
-def get_tenant(tenant_id: int):
+def get_tenant_by_id(tenant_id: int):
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT id, name FROM tenants WHERE id = %s", (tenant_id,))
-    tenant = cur.fetchone()
+    cur.execute(
+        "SELECT id, name FROM tenants WHERE id = %s",
+        (tenant_id,)
+    )
+
+    row = cur.fetchone()
 
     cur.close()
     conn.close()
-    return tenant
+
+    if not row:
+        return None
+
+    return {
+        "id": row[0],
+        "name": row[1]
+    }

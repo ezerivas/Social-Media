@@ -1,6 +1,6 @@
 import psycopg2
-from app.core.config import settings
+from core.config import DATABASE_URL
 
 
 def get_connection():
-    return psycopg2.connect(settings.DATABASE_URL)
+    return psycopg2.connect(DATABASE_URL)
