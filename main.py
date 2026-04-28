@@ -51,6 +51,9 @@ async def send(data: dict):
     recipient_id = data.get("recipient_id")
     text = data.get("text")
 
+    if not recipient_id or not text:
+        return {"error": "missing data"}
+
     url = "https://graph.facebook.com/v18.0/me/messages"
     params = {"access_token": PAGE_ACCESS_TOKEN}
 

@@ -1,3 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+
+<body>
+
+<h2>Conversaciones</h2>
+<ul id="conversations"></ul>
+
+<h2>Mensajes</h2>
+<ul id="messages"></ul>
+
+<input id="text" placeholder="Escribir mensaje">
+<button onclick="sendMessage()">Enviar</button>
+
 <script>
 let currentConversation = null;
 let currentUser = null;
@@ -7,6 +24,8 @@ async function loadConversations() {
     const data = await res.json();
 
     const list = document.getElementById('conversations');
+    if (!list) return;
+
     list.innerHTML = '';
 
     data.forEach(c => {
@@ -24,10 +43,14 @@ async function loadConversations() {
 }
 
 async function loadMessages() {
+    if (!currentConversation) return;
+
     const res = await fetch(`/conversations/${currentConversation}/messages`);
     const data = await res.json();
 
     const list = document.getElementById('messages');
+    if (!list) return;
+
     list.innerHTML = '';
 
     data.forEach(m => {
@@ -38,7 +61,10 @@ async function loadMessages() {
 }
 
 async function sendMessage() {
-    const text = document.getElementById('text').value;
+    const textInput = document.getElementById('text');
+    if (!textInput || !currentUser) return;
+
+    const text = textInput.value;
 
     await fetch('/send', {
         method: 'POST',
@@ -49,9 +75,16 @@ async function sendMessage() {
         })
     });
 
+    textInput.value = '';
     loadMessages();
 }
 
-setInterval(loadConversations, 3000);
-loadConversations();
+// 👇 IMPORTANTE: esperar DOM listo
+document.addEventListener("DOMContentLoaded", () => {
+    loadConversations();
+    setInterval(loadConversations, 3000);
+});
 </script>
+
+</body>
+</html>
