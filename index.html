@@ -69,6 +69,10 @@ async function loadMessages() {
 function connectWS() {
     ws = new WebSocket(`wss://${location.host}/ws/${currentConversation}`);
 
+    ws.onopen = () => {
+        console.log("WS conectado ✅");
+    };
+
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
@@ -79,6 +83,14 @@ function connectWS() {
 
         list.appendChild(li);
     };
+
+    ws.onerror = (err) => {
+        console.error("WS error", err);
+    };
+
+    ws.onclose = () => {
+        console.log("WS cerrado");
+    };
 }
 
 
@@ -86,8 +98,8 @@ function connectWS() {
 function sendMessage() {
     const text = document.getElementById('text').value;
 
-    if (!ws) {
-        alert("Seleccioná una conversación primero");
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert("WebSocket no conectado todavía");
         return;
     }
 

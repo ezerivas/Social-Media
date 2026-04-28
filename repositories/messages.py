@@ -9,7 +9,7 @@ def create_message(conversation_id: int, role: str, content: str):
         """
         INSERT INTO messages (conversation_id, role, content)
         VALUES (%s, %s, %s)
-        RETURNING id, role, content, created_at
+        RETURNING id, conversation_id, role, content, created_at
         """,
         (conversation_id, role, content)
     )
