@@ -1,15 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 
-from fastapi import APIRouter, Request
+from core.config import VERIFY_TOKEN
 from core.tenant_resolver import resolve_tenant
 from services.messaging import handle_incoming_message
-from fastapi import APIRouter, Request
-from fastapi.responses import PlainTextResponse
-
-from core.config import VERIFY_TOKEN
-
-
 
 router = APIRouter()
 

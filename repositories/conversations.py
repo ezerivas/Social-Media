@@ -12,15 +12,16 @@ def get_or_create_conversation(
 
     # buscar existente
     cur.execute(
-        """
-        SELECT id
-        FROM conversations
-        WHERE tenant_id = %s
-        AND user_id = %s
-        AND channel = %s
-        """,
-        (tenant_id, user_id, channel)
-    )
+    """
+    SELECT id
+    FROM conversations
+    WHERE tenant_id = %s
+    AND user_id = %s
+    AND channel = %s
+    AND external_user_id = %s
+    """,
+    (tenant_id, user_id, channel, external_user_id)
+)
 
     row = cur.fetchone()
 
