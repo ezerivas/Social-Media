@@ -4,6 +4,20 @@ from services.messaging import handle_incoming_message
 
 router = APIRouter()
 
+@router.get("/webhook/facebook")
+async def verify(request: Request):
+    params = request.query_params
+
+    mode = params.get("hub.mode")
+    token = params.get("hub.verify_token")
+    challenge = params.get("hub.challenge")
+
+    print("VERIFY HIT", params)
+
+    if mode == "subscribe" and token == VERIFY_TOKEN:
+        return PlainTextResponse(content=challenge)
+
+    return {"error": "verification failed"}
 
 @router.post("/webhook/facebook")
 async def webhook(request: Request):
