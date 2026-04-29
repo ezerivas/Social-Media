@@ -1,16 +1,25 @@
 import httpx
-from .base import IBaseChannel
+from app.channels.base import BaseChannel
 
-class FacebookChannel(IBaseChannel):
-    async def send_text(self, to_external_id: str, message_text: str, config: dict) -> str:
-        # Usa el token guardado dinámicamente para este tenant/canal
-        url = f"https://graph.facebook.com/v19.0/{config['page_id']}/messages"
+class FacebookChannel(BaseChannel):
+    """Lógica para interactuar con la Graph API de Facebook"""
+    
+    def __init__(self, access_token: str, page_id: str):
+        self.access_token = access_token
+        self.page_id = page_id
+        self.api_url = f"https://graph.facebook.com/v19.0/{page_id}/messages"
+
+    async def send_text(self, recipient_id: str, text: str):
+        """Envía un mensaje de texto plano a un usuario"""
         payload = {
-            "recipient": {"id": to_external_id},
-            "message": {"text": message_text},
-            "access_token": config['access_token']
+            "recipient": {"id": recipient_id},
+            "message": {"text": text},
+            "messaging_type": "MESSAGE_TAG",
+            "tag": "ACCOUNT_UPDATE" # O el tag correspondiente según política de Meta
         }
+        params = {"access_token": self.access_token}
+        
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            return resp.json().get("message_id")
+            response = await client.post(self.api_url, json=payload, params=params)
+            response.raise_for_status()
+            return response.json()

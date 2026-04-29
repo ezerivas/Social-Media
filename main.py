@@ -1,24 +1,38 @@
 import os
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
 import asyncpg
-from app.api.webhooks import facebook  # Importaremos tu router de webhook
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
+from contextlib import asynccontextmanager
+
+from app.api.webhooks import facebook
+from app.api.routes import messages
+from app.ws.manager import manager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Conexión al pool de la base de datos al iniciar
+    # Conexión a la base de datos en Railway
     app.state.db_pool = await asyncpg.create_pool(os.getenv("DATABASE_URL"))
-    print("🚀 Pool de base de datos conectado")
+    print("🚀 Pool de base de datos creado")
     yield
-    # Cerrar conexión al apagar
     await app.state.db_pool.close()
-    print("💤 Conexión a base de datos cerrada")
+    print("💤 Pool cerrado")
 
-app = FastAPI(title="Omnichannel API", lifespan=lifespan)
+app = FastAPI(title="Omnichannel Live", lifespan=lifespan)
 
-# Incluimos los routers de los webhooks
-app.include_router(facebook.router, prefix="/webhooks", tags=["Meta"])
+# --- RUTAS ---
+app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
+app.include_router(messages.router, prefix="/api/v1/messages", tags=["Messages"])
+
+# --- ENDPOINT WEBSOCKET ---
+@app.websocket("/ws/{tenant_id}")
+async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
+    await manager.connect(websocket, tenant_id)
+    try:
+        while True:
+            # Mantener conexión viva
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, tenant_id)
 
 @app.get("/")
-async def health_check():
-    return {"status": "online", "message": "API de mensajería operativa"}
+async def root():
+    return {"status": "online", "service": "Omnichannel API"}
