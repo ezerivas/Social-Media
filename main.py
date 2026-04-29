@@ -1,52 +1,24 @@
 import os
-import asyncpg
-from fastapi import FastAPI, Request, Query, HTTPException
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
+import asyncpg
+from app.api.webhooks import facebook  # Importaremos tu router de webhook
 
-# 1. Gestión del ciclo de vida (Conexión a DB)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Esto se ejecuta al arrancar la app en Railway
+    # Conexión al pool de la base de datos al iniciar
     app.state.db_pool = await asyncpg.create_pool(os.getenv("DATABASE_URL"))
-    print("Conexión a PostgreSQL establecida")
+    print("🚀 Pool de base de datos conectado")
     yield
-    # Esto se ejecuta al apagar la app
+    # Cerrar conexión al apagar
     await app.state.db_pool.close()
-    print("Conexión a PostgreSQL cerrada")
+    print("💤 Conexión a base de datos cerrada")
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Omnichannel API", lifespan=lifespan)
 
-# --- RUTAS DE PRUEBA ---
+# Incluimos los routers de los webhooks
+app.include_router(facebook.router, prefix="/webhooks", tags=["Meta"])
 
 @app.get("/")
-async def root():
-    return {"message": "Omnichannel API is running!"}
-
-# --- WEBHOOK DE FACEBOOK/WHATSAPP ---
-
-VERIFY_TOKEN = os.getenv("FACEBOOK_TOKEN")
-
-@app.get("/webhook")
-async def verify_facebook_webhook(
-    mode: str = Query(None, alias="hub.mode"),
-    token: str = Query(None, alias="hub.verify_token"),
-    challenge: str = Query(None, alias="hub.challenge")
-):
-    """Ruta obligatoria para que Meta valide tu servidor"""
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        print("Webhook verificado con éxito")
-        return int(challenge)
-    raise HTTPException(status_code=403, detail="Token de verificación inválido")
-
-@app.post("/webhook")
-async def handle_facebook_events(request: Request):
-    """Ruta donde llegarán los mensajes reales"""
-    payload = await request.json()
-    
-    # Por ahora solo imprimimos en logs de Railway para validar
-    print(f"📩 Evento recibido: {payload}")
-    
-    # Aquí es donde más adelante llamarás a tu Repository para 
-    # hacer el INSERT INTO messages...
-    
-    return {"status": "EVENT_RECEIVED"}
+async def health_check():
+    return {"status": "online", "message": "API de mensajería operativa"}

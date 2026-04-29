@@ -1,23 +1,44 @@
-from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
+from app.repositories.messages import MessageRepository
 import os
 
 router = APIRouter()
 
-VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN")
-
-@router.get("/facebook")
-async def verify_webhook(
-    mode: str = Query(None, alias="hub.mode"),
-    token: str = Query(None, alias="hub.verify_token"),
-    challenge: str = Query(None, alias="hub.challenge")
-):
-    if mode == "subscribe" and token == VERIFY_TOKEN:
-        return int(challenge)
-    raise HTTPException(status_code=403, detail="Token de verificación inválido")
+# Dependencia para obtener el repositorio
+async def get_repo(request: Request):
+    return MessageRepository(request.app.state.db_pool)
 
 @router.post("/facebook")
-async def handle_messages(request: Request):
+async def handle_facebook_events(request: Request, repo: MessageRepository = Depends(get_repo)):
     payload = await request.json()
-    # Aquí iría tu lógica para enviar al Worker o Repository
-    print(f"Mensaje recibido: {payload}")
-    return {"status": "ok"}
+    
+    try:
+        # 1. Extraer datos básicos del JSON de Meta (Simplificado para la prueba)
+        # Meta envía los mensajes en entry -> messaging
+        for entry in payload.get("entry", []):
+            for messaging_event in entry.get("messaging", []):
+                sender_id = messaging_event["sender"]["id"]
+                message_text = messaging_event.get("message", {}).get("text")
+                
+                if message_text:
+                    # 2. Lógica Multi-tenant inicial:
+                    # Buscamos o creamos la conversación para el tenant 1 (el 'default' que creamos)
+                    conv_id = await repo.get_or_create_conversation(
+                        tenant_id=1, 
+                        user_id=1, # Usuario genérico inicial
+                        channel="facebook",
+                        external_user_id=sender_id
+                    )
+                    
+                    # 3. Guardar el mensaje
+                    await repo.create_message(
+                        conversation_id=conv_id,
+                        role="user",
+                        content=message_text
+                    )
+                    print(f"✅ Mensaje guardado en DB: {message_text}")
+
+        return {"status": "success"}
+    except Exception as e:
+        print(f"❌ Error procesando webhook: {e}")
+        return {"status": "error", "message": str(e)}
