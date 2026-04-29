@@ -3,7 +3,7 @@ import os
 
 router = APIRouter()
 
-VERIFY_TOKEN = os.getenv("FACEBOOK_TOKEN")
+VERIFY_TOKEN = os.getenv("META_VERIFY_TOKEN")
 
 @router.get("/facebook")
 async def verify_webhook(
