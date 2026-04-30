@@ -128,8 +128,11 @@ class MessagingService:
             except Exception as e:
                 logger.warning("Failed to send via channel adapter: %s", e)
         else:
+            if channel_name == "facebook":
+                logger.error("Missing Facebook channel configuration (DB and env)")
+                raise ValueError("Facebook channel is not configured")
             logger.warning("No channel config found; outbound will only be persisted internally")
-            send_success = True  # Preserve current behavior for local testing
+            send_success = True
 
         if not send_success:
             logger.error("Failed to send message via channel adapter")
