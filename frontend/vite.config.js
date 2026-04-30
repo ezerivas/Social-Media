@@ -8,4 +8,10 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
+  server: {
+    allowedHosts: ['social-media-production-c7a6.up.railway.app'],
+  },
+  preview: {
+    allowedHosts: ['social-media-production-c7a6.up.railway.app'],
+  },
 });
