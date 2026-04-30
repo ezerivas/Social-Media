@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
+from app.repositories.messages import MessageRepository
 from app.services.messaging import MessagingService
 from app.ws.manager import manager
 
@@ -12,15 +13,38 @@ class MessageRequest(BaseModel):
     content: str
 
 
+def resolve_tenant_id(req: Request) -> int:
+    return getattr(req.state, "tenant_id", 1)
+
+
+@router.get("/channels")
+async def list_channels():
+    return [
+        {"id": "facebook", "name": "Facebook", "enabled": True},
+        {"id": "instagram", "name": "Instagram", "enabled": False},
+        {"id": "whatsapp", "name": "WhatsApp", "enabled": False},
+    ]
+
+
+@router.get("/conversations")
+async def list_conversations(req: Request, channel: str = Query(...)):
+    tenant_id = resolve_tenant_id(req)
+    repo = MessageRepository(req.app.state.db_pool)
+    conversations = await repo.list_conversations(tenant_id=tenant_id, channel=channel)
+    return {"data": conversations}
+
+
+@router.get("/conversations/{conversation_id}/messages")
+async def list_conversation_messages(req: Request, conversation_id: int):
+    tenant_id = resolve_tenant_id(req)
+    repo = MessageRepository(req.app.state.db_pool)
+    messages = await repo.list_messages(tenant_id=tenant_id, conversation_id=conversation_id)
+    return {"data": messages}
+
+
 @router.post("/send", status_code=status.HTTP_201_CREATED)
 async def send_message(req: Request, data: MessageRequest):
-    tenant_id = getattr(req.state, "tenant_id", None)
-    if not tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Tenant no identificado",
-        )
-
+    tenant_id = resolve_tenant_id(req)
     service = MessagingService(req.app.state.db_pool, ws_manager=manager)
 
     try:
