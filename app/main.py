@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import asyncpg
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.websockets import WebSocketDisconnect
 
 from app.api.routes import messages
 from app.api.webhooks import facebook
@@ -75,14 +76,10 @@ async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
 
     try:
         while True:
-            data = await websocket.receive_text()
-            await manager.broadcast_to_tenant(
-                tenant_id,
-                {
-                    "event": "message",
-                    "data": data,
-                },
-            )
+            # Keep connection alive and detect disconnects.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected: tenant_id=%s", tenant_id)
     finally:
         manager.disconnect(websocket, tenant_id)
         logger.info(f"WebSocket disconnected: tenant_id={tenant_id}")

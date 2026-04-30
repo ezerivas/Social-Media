@@ -2,11 +2,13 @@
 Messaging service for handling inbound and outbound messages.
 """
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from app.channels.base import BaseChannel
 from app.channels.facebook import FacebookChannel
 from app.channels.whatsapp import WhatsAppChannel
+from app.core.config import settings
 from app.repositories.messages import MessageRepository
 
 logger = logging.getLogger(__name__)
@@ -74,6 +76,39 @@ class MessagingService:
 
         return saved_message
 
+
+    def _resolve_channel_config(
+        self,
+        tenant_id: int,
+        channel_name: str,
+        db_config: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Resolve channel config from DB first, then environment fallback."""
+        if channel_name != "facebook":
+            return db_config
+
+        if db_config:
+            access_token = (
+                db_config.get("access_token")
+                or db_config.get("page_access_token")
+                or db_config.get("token")
+            )
+            if access_token:
+                return {"access_token": access_token}
+
+        access_token = (
+            settings.FACEBOOK_ACCESS_TOKEN
+            or os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
+            or os.getenv("FB_PAGE_ACCESS_TOKEN")
+            or os.getenv("FACEBOOK_TOKEN")
+        )
+        if access_token:
+            logger.info("Using Facebook channel config from environment variables")
+            return {"access_token": access_token}
+
+        logger.error("Facebook access token not found in DB config or environment")
+        return None
+
     async def send_outbound_message(
         self,
         tenant_id: int,
@@ -97,7 +132,8 @@ class MessagingService:
         channel_adapter = self._get_channel(channel_name)
 
         # Get channel configuration (optional)
-        channel_config = await self.repository.get_channel_config(tenant_id, channel_name)
+        db_channel_config = await self.repository.get_channel_config(tenant_id, channel_name)
+        channel_config = self._resolve_channel_config(tenant_id, channel_name, db_channel_config)
 
         # Try to send via channel adapter (if config exists)
         send_success = False
@@ -111,12 +147,15 @@ class MessagingService:
             except Exception as e:
                 logger.warning("Failed to send via channel adapter: %s", e)
         else:
-            logger.warning("No channel config found, skipping external send")
-            send_success = True  # Allow saving without external send
+            if channel_name == "facebook":
+                logger.error("Missing Facebook channel configuration (DB and env)")
+                raise ValueError("Facebook channel is not configured")
+            logger.warning("No channel config found; outbound will only be persisted internally")
+            send_success = True
 
         if not send_success:
             logger.error("Failed to send message via channel adapter")
-            return None
+            raise ValueError("Could not deliver message to external channel")
 
         # Save outbound message to database
         saved_message = await self.repository.save_outbound_message(
