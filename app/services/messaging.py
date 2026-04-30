@@ -2,6 +2,7 @@
 Messaging service for handling inbound and outbound messages.
 """
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from app.channels.base import BaseChannel
@@ -76,17 +77,36 @@ class MessagingService:
         return saved_message
 
 
-    def _resolve_channel_config(self, tenant_id: int, channel_name: str, db_config: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _resolve_channel_config(
+        self,
+        tenant_id: int,
+        channel_name: str,
+        db_config: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
         """Resolve channel config from DB first, then environment fallback."""
-        if db_config:
+        if channel_name != "facebook":
             return db_config
 
-        if channel_name == "facebook" and settings.FACEBOOK_ACCESS_TOKEN:
-            logger.info("Using Facebook channel config from environment variables")
-            return {
-                "access_token": settings.FACEBOOK_ACCESS_TOKEN,
-            }
+        if db_config:
+            access_token = (
+                db_config.get("access_token")
+                or db_config.get("page_access_token")
+                or db_config.get("token")
+            )
+            if access_token:
+                return {"access_token": access_token}
 
+        access_token = (
+            settings.FACEBOOK_ACCESS_TOKEN
+            or os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
+            or os.getenv("FB_PAGE_ACCESS_TOKEN")
+            or os.getenv("FACEBOOK_TOKEN")
+        )
+        if access_token:
+            logger.info("Using Facebook channel config from environment variables")
+            return {"access_token": access_token}
+
+        logger.error("Facebook access token not found in DB config or environment")
         return None
 
     async def send_outbound_message(
