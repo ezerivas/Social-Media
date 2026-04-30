@@ -43,7 +43,7 @@ async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
 
             except Exception as inner:
                 print("⚠️ Error interno WS:", inner)
-                break
+                continue
 
     except Exception as e:
         print("🔴 WS cerrado:", e)

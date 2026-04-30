@@ -22,11 +22,11 @@ function Dashboard() {
 
     // 📩 Cuando llega un mensaje del servidor
     socket.onmessage = (event) => {
-      console.log("📩 Mensaje recibido:", event.data);
+  const data = JSON.parse(event.data);
 
-      // Si el backend manda JSON, lo podés parsear así:
-      // const data = JSON.parse(event.data);
-    };
+  console.log("📩 evento:", data.event);
+  console.log("💬 mensaje:", data.data);
+};
 
     // ❌ Errores de conexión
     socket.onerror = (error) => {
