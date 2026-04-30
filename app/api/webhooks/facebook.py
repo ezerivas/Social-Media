@@ -8,6 +8,17 @@ router = APIRouter()
 async def get_repo(request: Request):
     return MessageRepository(request.app.state.db_pool)
 
+# 1. Validación del Webhook (GET) - Esto quita el error 405
+@router.get("/facebook")
+async def verify_facebook(
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token")
+):
+    if hub_mode == "subscribe" and hub_verify_token == "token_prueba": # Tu token
+        return Response(content=hub_challenge)
+    return Response(content="Error de validación", status_code=403)
+
 @router.post("/facebook")
 async def handle_facebook_events(request: Request, repo: MessageRepository = Depends(get_repo)):
     payload = await request.json()
