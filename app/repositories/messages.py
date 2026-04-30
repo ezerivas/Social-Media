@@ -24,12 +24,9 @@ class MessageRepository:
         content: str,
         role: str,
     ) -> Dict[str, Any]:
-        """
-        Save an inbound message and create user/conversation if needed.
-        """
+        """Save an inbound message and create user/conversation if needed."""
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                # Ensure user exists
                 user_id = await conn.fetchval(
                     """
                     INSERT INTO users (tenant_id, external_id)
@@ -41,8 +38,7 @@ class MessageRepository:
                     user_external_id,
                 )
 
-                # Ensure conversation exists
-                conv_id = await conn.fetchval(
+                conversation_id = await conn.fetchval(
                     """
                     INSERT INTO conversations (tenant_id, user_id, channel, external_user_id, last_message_at)
                     VALUES ($1, $2, $3, $4, NOW())
@@ -56,22 +52,52 @@ class MessageRepository:
                     user_external_id,
                 )
 
-                # Insert message
                 row = await conn.fetchrow(
                     """
                     INSERT INTO messages (conversation_id, role, content, created_at)
                     VALUES ($1, $2, $3, NOW())
                     RETURNING id, conversation_id, role, content, created_at
                     """,
-                    conv_id,
+                    conversation_id,
                     role,
                     content,
                 )
 
-                result = dict(row)
-                result["tenant_id"] = tenant_id
-                logger.debug("Message saved: conversation_id=%s", conv_id)
-                return result
+                saved_message = dict(row)
+                saved_message["tenant_id"] = tenant_id
+                logger.debug("Inbound message saved: conversation_id=%s", conversation_id)
+                return saved_message
+
+    async def save_outbound_message(
+        self,
+        conversation_id: int,
+        content: str,
+        role: str = "agent",
+    ) -> Dict[str, Any]:
+        """Save an outbound message and update conversation recency."""
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO messages (conversation_id, role, content, created_at)
+                    VALUES ($1, $2, $3, NOW())
+                    RETURNING id, conversation_id, role, content, created_at
+                    """,
+                    conversation_id,
+                    role,
+                    content,
+                )
+
+                await conn.execute(
+                    """
+                    UPDATE conversations
+                    SET last_message_at = NOW()
+                    WHERE id = $1
+                    """,
+                    conversation_id,
+                )
+
+                return dict(row)
 
     async def get_conversation_details(self, conversation_id: int) -> Optional[Dict[str, Any]]:
         """Get conversation details by ID."""
@@ -95,27 +121,7 @@ class MessageRepository:
             config_json = await conn.fetchval(query, tenant_id, channel_name)
             return json.loads(config_json) if isinstance(config_json, str) else config_json
 
-    async def save_outbound_message(
-        self,
-        conversation_id: int,
-        content: str,
-        role: str = "agent",
-    ) -> Dict[str, Any]:
-        """Save an outbound message."""
-        query = """
-            INSERT INTO messages (conversation_id, role, content, created_at)
-            VALUES ($1, $2, $3, NOW())
-            RETURNING id, conversation_id, role, content, created_at
-        """
-        async with self.pool.acquire() as conn:
-            row = await conn.fetchrow(query, conversation_id, role, content)
-            return dict(row)
-
-    async def list_conversations(
-        self,
-        tenant_id: int,
-        channel: str,
-    ) -> List[Dict[str, Any]]:
+    async def list_conversations(self, tenant_id: int, channel: str) -> List[Dict[str, Any]]:
         """List conversations for a channel with last message info."""
         query = """
             SELECT c.id, c.channel, c.external_user_id, c.last_message_at,
@@ -136,24 +142,8 @@ class MessageRepository:
             rows = await conn.fetch(query, tenant_id, channel)
             return [dict(row) for row in rows]
 
-    async def list_messages(
-        self,
-        tenant_id: int,
-        conversation_id: int,
-    ) -> List[Dict[str, Any]]:
-        """List messages for a conversation."""
-        query = """
-            SELECT id, conversation_id, role, content, created_at
-            FROM messages
-            WHERE conversation_id = $1
-            ORDER BY created_at ASC
-        """
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(query, conversation_id)
-            return [dict(row) for row in rows]
-            return [dict(row) for row in rows]
-
     async def list_messages(self, tenant_id: int, conversation_id: int) -> List[Dict[str, Any]]:
+        """List messages for a conversation scoped to tenant."""
         query = """
             SELECT m.id, m.conversation_id, m.role, m.content, m.created_at
             FROM messages m

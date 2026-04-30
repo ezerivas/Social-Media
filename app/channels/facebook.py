@@ -60,13 +60,12 @@ class FacebookChannel(BaseChannel):
             True if sent successfully
         """
         access_token = config.get("access_token")
-        page_id = config.get("page_id")
+        if not access_token:
+            logger.error("Facebook configuration incomplete: missing access_token")
+            raise ValueError("Facebook configuration incomplete: missing access_token")
 
-        if not access_token or not page_id:
-            logger.error("Facebook configuration incomplete")
-            raise ValueError("Facebook configuration incomplete")
-
-        api_url = f"{self.GRAPH_API_BASE_URL}/{page_id}/messages"
+        # Messenger Send API uses /me/messages with a Page Access Token.
+        api_url = f"{self.GRAPH_API_BASE_URL}/me/messages"
         payload = {
             "recipient": {"id": recipient_id},
             "message": {"text": message_text},
@@ -76,6 +75,9 @@ class FacebookChannel(BaseChannel):
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(api_url, json=payload, params=params)
+
+        if response.is_error:
+            logger.error("Facebook send failed: status=%s body=%s", response.status_code, response.text)
             response.raise_for_status()
 
         logger.info("Message sent to Facebook user: %s", recipient_id)
