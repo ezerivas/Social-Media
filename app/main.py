@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 import asyncpg
@@ -6,12 +5,17 @@ from fastapi import FastAPI, WebSocket
 
 from app.api.routes import messages
 from app.api.webhooks import facebook
+from app.core.config import settings
 from app.ws.manager import manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.db_pool = await asyncpg.create_pool(os.getenv("DATABASE_URL"))
+    database_url = settings.DATABASE_URL
+    if not database_url:
+        raise RuntimeError("DATABASE_URL no está configurada")
+
+    app.state.db_pool = await asyncpg.create_pool(database_url)
     yield
     await app.state.db_pool.close()
 
