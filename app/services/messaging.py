@@ -81,11 +81,10 @@ class MessagingService:
         if db_config:
             return db_config
 
-        if channel_name == "facebook" and settings.FACEBOOK_ACCESS_TOKEN and settings.FACEBOOK_PAGE_ID:
+        if channel_name == "facebook" and settings.FACEBOOK_ACCESS_TOKEN:
             logger.info("Using Facebook channel config from environment variables")
             return {
                 "access_token": settings.FACEBOOK_ACCESS_TOKEN,
-                "page_id": settings.FACEBOOK_PAGE_ID,
             }
 
         return None

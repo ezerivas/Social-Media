@@ -63,6 +63,7 @@ function Dashboard() {
   const [replyText, setReplyText] = useState("");
   const socketRef = useRef(null);
   const selectedConversationIdRef = useRef(null);
+  const selectedChannelRef = useRef("facebook");
   const chatBoxRef = useRef(null);
 
   // Derived state
@@ -102,49 +103,73 @@ function Dashboard() {
     selectedConversationIdRef.current = selectedConversationId;
   }, [selectedConversationId]);
 
+  useEffect(() => {
+    selectedChannelRef.current = selectedChannel;
+  }, [selectedChannel]);
+
 
   // WebSocket connection
   useEffect(() => {
-    const socket = new WebSocket(getWebSocketUrl(1));
-    socketRef.current = socket;
+    let socket = null;
+    let reconnectTimer = null;
 
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (!["new_message", "message_sent"].includes(payload.type)) return;
+    const connect = () => {
+      socket = new WebSocket(getWebSocketUrl(1));
+      socketRef.current = socket;
 
-        const incoming = payload.data;
-        if (!incoming?.conversation_id) return;
+      socket.onmessage = async (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (!["new_message", "message_sent"].includes(payload.type)) return;
 
-        setConversations((prev) => {
-          const exists = prev.some((conversation) => conversation.id === incoming.conversation_id);
-          if (exists) {
-            return prev.map((conversation) =>
-              conversation.id === incoming.conversation_id
-                ? {
-                    ...conversation,
-                    last_message: incoming.content,
-                    last_message_role: incoming.role,
-                    last_message_at: incoming.created_at,
-                  }
-                : conversation
-            );
+          const incoming = payload.data;
+          if (!incoming?.conversation_id) return;
+
+          let conversationExists = false;
+          setConversations((prev) => {
+            conversationExists = prev.some((conversation) => conversation.id === incoming.conversation_id);
+            if (conversationExists) {
+              return prev.map((conversation) =>
+                conversation.id === incoming.conversation_id
+                  ? {
+                      ...conversation,
+                      last_message: incoming.content,
+                      last_message_role: incoming.role,
+                      last_message_at: incoming.created_at,
+                    }
+                  : conversation
+              );
+            }
+
+            return prev;
+          });
+
+          if (!conversationExists) {
+            const data = await listConversations(selectedChannelRef.current);
+            setConversations(data.data || []);
           }
 
-          return prev;
-        });
-
-        if (incoming.conversation_id === selectedConversationIdRef.current) {
-          setMessages((prev) =>
-            prev.some((message) => message.id === incoming.id) ? prev : [...prev, incoming]
-          );
+          if (incoming.conversation_id === selectedConversationIdRef.current) {
+            setMessages((prev) =>
+              prev.some((message) => message.id === incoming.id) ? prev : [...prev, incoming]
+            );
+          }
+        } catch (error) {
+          console.error("WS parse error", error);
         }
-      } catch (error) {
-        console.error("WS parse error", error);
-      }
+      };
+
+      socket.onclose = () => {
+        reconnectTimer = setTimeout(connect, 1500);
+      };
     };
 
-    return () => socket.close();
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) socket.close();
+    };
   }, []);
 
   useEffect(() => {
