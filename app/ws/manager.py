@@ -5,6 +5,7 @@ import logging
 from typing import Dict, List
 
 from fastapi import WebSocket
+from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class ConnectionManager:
         dead_connections: List[WebSocket] = []
         for connection in tenant_connections:
             try:
-                await connection.send_json(message)
+                await connection.send_json(jsonable_encoder(message))
             except Exception as e:
                 logger.warning("Failed to send to connection: %s", e)
                 dead_connections.append(connection)

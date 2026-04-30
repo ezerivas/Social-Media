@@ -62,6 +62,9 @@ function Dashboard() {
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState("");
   const socketRef = useRef(null);
+  const selectedConversationIdRef = useRef(null);
+  const selectedChannelRef = useRef("facebook");
+  const chatBoxRef = useRef(null);
 
   // Derived state
   const selectedConversation = useMemo(
@@ -96,62 +99,109 @@ function Dashboard() {
       .catch(console.error);
   }, [selectedConversationId]);
 
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    selectedChannelRef.current = selectedChannel;
+  }, [selectedChannel]);
+
+
   // WebSocket connection
   useEffect(() => {
-    const socket = new WebSocket(getWebSocketUrl(1));
-    socketRef.current = socket;
+    let socket = null;
+    let reconnectTimer = null;
 
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (!["new_message", "message_sent"].includes(payload.type)) return;
+    const connect = () => {
+      socket = new WebSocket(getWebSocketUrl(1));
+      socketRef.current = socket;
 
-        const incoming = payload.data;
+      socket.onmessage = async (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (!["new_message", "message_sent"].includes(payload.type)) return;
 
-        setConversations((prev) => {
-          const exists = prev.some((c) => c.id === incoming.conversation_id);
-          if (exists) {
-            return prev.map((c) =>
-              c.id === incoming.conversation_id
-                ? {
-                    ...c,
-                    last_message: incoming.content,
-                    last_message_role: incoming.role,
-                    last_message_at: incoming.created_at,
-                  }
-                : c
-            );
+          const incoming = payload.data;
+          if (!incoming?.conversation_id) return;
+
+          let conversationExists = false;
+          setConversations((prev) => {
+            conversationExists = prev.some((conversation) => conversation.id === incoming.conversation_id);
+            if (conversationExists) {
+              return prev.map((conversation) =>
+                conversation.id === incoming.conversation_id
+                  ? {
+                      ...conversation,
+                      last_message: incoming.content,
+                      last_message_role: incoming.role,
+                      last_message_at: incoming.created_at,
+                    }
+                  : conversation
+              );
+            }
+
+            return prev;
+          });
+
+          if (!conversationExists) {
+            const data = await listConversations(selectedChannelRef.current);
+            setConversations(data.data || []);
           }
 
-          return [
-            {
-              id: incoming.conversation_id,
-              channel: selectedChannel,
-              external_user_id: "nuevo",
-              last_message: incoming.content,
-              last_message_role: incoming.role,
-              last_message_at: incoming.created_at,
-            },
-            ...prev,
-          ];
-        });
-
-        if (incoming.conversation_id === selectedConversationId) {
-          setMessages((prev) => [...prev, incoming]);
+          if (incoming.conversation_id === selectedConversationIdRef.current) {
+            setMessages((prev) =>
+              prev.some((message) => message.id === incoming.id) ? prev : [...prev, incoming]
+            );
+          }
+        } catch (error) {
+          console.error("WS parse error", error);
         }
-      } catch (error) {
-        console.error("WS parse error", error);
-      }
+      };
+
+      socket.onclose = () => {
+        reconnectTimer = setTimeout(connect, 1500);
+      };
     };
 
-    return () => socket.close();
-  }, [selectedChannel, selectedConversationId]);
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) socket.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!chatBoxRef.current) return;
+    chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+  }, [messages]);
 
   // Handlers
   const handleSend = async () => {
     if (!selectedConversationId || !replyText.trim()) return;
     try {
-      await sendMessage(selectedConversationId, replyText.trim());
+      const response = await sendMessage(selectedConversationId, replyText.trim());
+      const outboundMessage = response?.data;
+
+      if (outboundMessage) {
+        setMessages((prev) =>
+          prev.some((message) => message.id === outboundMessage.id) ? prev : [...prev, outboundMessage]
+        );
+        setConversations((prev) =>
+          prev.map((conversation) =>
+            conversation.id === selectedConversationId
+              ? {
+                  ...conversation,
+                  last_message: outboundMessage.content,
+                  last_message_role: outboundMessage.role,
+                  last_message_at: outboundMessage.created_at,
+                }
+              : conversation
+          )
+        );
+      }
+
       setReplyText("");
     } catch (error) {
       console.error(error);
@@ -205,7 +255,7 @@ function Dashboard() {
             ? `Chat ${selectedConversation.external_user_id}`
             : "Selecciona una conversación"}
         </h3>
-        <div style={styles.chatBox}>
+        <div ref={chatBoxRef} style={styles.chatBox}>
           {messages.map((msg) => {
             const isOperator = msg.role === "agent";
             return (
