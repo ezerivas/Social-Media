@@ -62,6 +62,7 @@ function Dashboard() {
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState("");
   const socketRef = useRef(null);
+  const selectedConversationIdRef = useRef(null);
 
   // Derived state
   const selectedConversation = useMemo(
@@ -96,6 +97,11 @@ function Dashboard() {
       .catch(console.error);
   }, [selectedConversationId]);
 
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+
   // WebSocket connection
   useEffect(() => {
     const socket = new WebSocket(getWebSocketUrl(1));
@@ -107,37 +113,30 @@ function Dashboard() {
         if (!["new_message", "message_sent"].includes(payload.type)) return;
 
         const incoming = payload.data;
+        if (!incoming?.conversation_id) return;
 
         setConversations((prev) => {
-          const exists = prev.some((c) => c.id === incoming.conversation_id);
+          const exists = prev.some((conversation) => conversation.id === incoming.conversation_id);
           if (exists) {
-            return prev.map((c) =>
-              c.id === incoming.conversation_id
+            return prev.map((conversation) =>
+              conversation.id === incoming.conversation_id
                 ? {
-                    ...c,
+                    ...conversation,
                     last_message: incoming.content,
                     last_message_role: incoming.role,
                     last_message_at: incoming.created_at,
                   }
-                : c
+                : conversation
             );
           }
 
-          return [
-            {
-              id: incoming.conversation_id,
-              channel: selectedChannel,
-              external_user_id: "nuevo",
-              last_message: incoming.content,
-              last_message_role: incoming.role,
-              last_message_at: incoming.created_at,
-            },
-            ...prev,
-          ];
+          return prev;
         });
 
-        if (incoming.conversation_id === selectedConversationId) {
-          setMessages((prev) => [...prev, incoming]);
+        if (incoming.conversation_id === selectedConversationIdRef.current) {
+          setMessages((prev) =>
+            prev.some((message) => message.id === incoming.id) ? prev : [...prev, incoming]
+          );
         }
       } catch (error) {
         console.error("WS parse error", error);
@@ -145,13 +144,33 @@ function Dashboard() {
     };
 
     return () => socket.close();
-  }, [selectedChannel, selectedConversationId]);
+  }, []);
 
   // Handlers
   const handleSend = async () => {
     if (!selectedConversationId || !replyText.trim()) return;
     try {
-      await sendMessage(selectedConversationId, replyText.trim());
+      const response = await sendMessage(selectedConversationId, replyText.trim());
+      const outboundMessage = response?.data;
+
+      if (outboundMessage) {
+        setMessages((prev) =>
+          prev.some((message) => message.id === outboundMessage.id) ? prev : [...prev, outboundMessage]
+        );
+        setConversations((prev) =>
+          prev.map((conversation) =>
+            conversation.id === selectedConversationId
+              ? {
+                  ...conversation,
+                  last_message: outboundMessage.content,
+                  last_message_role: outboundMessage.role,
+                  last_message_at: outboundMessage.created_at,
+                }
+              : conversation
+          )
+        );
+      }
+
       setReplyText("");
     } catch (error) {
       console.error(error);
