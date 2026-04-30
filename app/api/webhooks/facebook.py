@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, Querys
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from app.repositories.messages import MessageRepository
 import os
 
