@@ -26,13 +26,15 @@ app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
 @app.websocket("/ws/{tenant_id}")
 async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
     await manager.connect(websocket, tenant_id)
+
     try:
         while True:
-            # Mantener conexión viva
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            print("📩 Mensaje recibido:", data)
+
+            # 👇 RESPUESTA (para que el frontend reciba algo)
+            await websocket.send_text(f"Echo: {data}")
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, tenant_id)
-
-@app.get("/")
-async def root():
-    return {"status": "online", "service": "Omnichannel API"}
+        print("🔴 Cliente desconectado")
