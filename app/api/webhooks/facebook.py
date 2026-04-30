@@ -8,15 +8,21 @@ router = APIRouter()
 async def get_repo(request: Request):
     return MessageRepository(request.app.state.db_pool)
 
-# 1. Validación del Webhook (GET) - Esto quita el error 405
 @router.get("/facebook")
 async def verify_facebook(
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_challenge: str = Query(None, alias="hub.challenge"),
     hub_verify_token: str = Query(None, alias="hub.verify_token")
 ):
-    if hub_mode == "subscribe" and hub_verify_token == "token_prueba": # Tu token
-        return Response(content=hub_challenge)
+    # Obtener el token desde la variable de entorno de Railway
+    # Se recomienda usar FACEBOOK_VERIFY_TOKEN para evitar confusiones [cite: 544, 1713]
+    expected_token = os.getenv("FACEBOOK_VERIFY_TOKEN", "token_prueba")
+
+    if hub_mode == "subscribe" and hub_verify_token == expected_token:
+        # Es CRÍTICO retornar solo el challenge como texto plano [cite: 976]
+        return Response(content=hub_challenge, media_type="text/plain")
+    
+    print(f"❌ Validación fallida. Recibido: {hub_verify_token}, Esperado: {expected_token}")
     return Response(content="Error de validación", status_code=403)
 
 @router.post("/facebook")
