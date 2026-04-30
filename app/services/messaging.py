@@ -116,7 +116,7 @@ class MessagingService:
 
         if not send_success:
             logger.error("Failed to send message via channel adapter")
-            return None
+            raise ValueError("Could not deliver message to external channel")
 
         # Save outbound message to database
         saved_message = await self.repository.save_outbound_message(
