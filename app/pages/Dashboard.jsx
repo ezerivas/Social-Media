@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  API_URL,
   listChannels,
   listConversations,
   listMessages,
   sendMessage,
+  getWebSocketUrl,
 } from "../services/api";
 
 function Dashboard() {
@@ -30,7 +30,7 @@ function Dashboard() {
       .then((data) => {
         const items = data.data || [];
         setConversations(items);
-        setSelectedConversationId((prev) => prev ?? items[0]?.id ?? null);
+        setSelectedConversationId(items[0]?.id ?? null);
       })
       .catch(console.error);
   }, [selectedChannel]);
@@ -46,7 +46,7 @@ function Dashboard() {
   }, [selectedConversationId]);
 
   useEffect(() => {
-    const socket = new WebSocket(`${API_URL.replace("https", "wss")}/ws/1`);
+    const socket = new WebSocket(getWebSocketUrl(1));
     socketRef.current = socket;
 
     socket.onmessage = (event) => {

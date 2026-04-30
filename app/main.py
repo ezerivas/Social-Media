@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 
 import asyncpg
 from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
 
 from app.api.routes import messages
 from app.api.webhooks import facebook
@@ -21,27 +20,6 @@ app = FastAPI(title="Omnichannel Live", lifespan=lifespan)
 
 app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
 app.include_router(messages.router, prefix="/messages", tags=["Messages"])
-
-
-@app.get("/", response_class=HTMLResponse)
-@app.get("/index", response_class=HTMLResponse)
-@app.get("/index.html", response_class=HTMLResponse)
-async def index():
-    return """
-    <html>
-      <head><title>Omnichannel Live</title></head>
-      <body style='font-family: Arial; padding: 24px;'>
-        <h1>Omnichannel Live</h1>
-        <p>Backend activo ✅</p>
-        <ul>
-          <li><a href='/health'>/health</a></li>
-          <li><a href='/messages/channels'>/messages/channels</a></li>
-          <li><a href='/messages/conversations?channel=facebook'>/messages/conversations?channel=facebook</a></li>
-          <li><a href='/docs'>/docs</a></li>
-        </ul>
-      </body>
-    </html>
-    """
 
 
 @app.get("/health")

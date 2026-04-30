@@ -1,4 +1,5 @@
-const API_URL = "https://social-media-production-0ef2.up.railway.app";
+const API_URL =
+  import.meta.env.VITE_API_URL || "https://social-media-production-0ef2.up.railway.app";
 
 async function getJson(path) {
   const response = await fetch(`${API_URL}${path}`);
@@ -32,6 +33,11 @@ export async function sendMessage(conversation_id, content) {
   }
 
   return response.json();
+}
+
+export function getWebSocketUrl(tenantId = 1) {
+  const wsBase = API_URL.replace("https://", "wss://").replace("http://", "ws://");
+  return `${wsBase}/ws/${tenantId}`;
 }
 
 export { API_URL };
