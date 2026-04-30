@@ -63,6 +63,7 @@ function Dashboard() {
   const [replyText, setReplyText] = useState("");
   const socketRef = useRef(null);
   const selectedConversationIdRef = useRef(null);
+  const chatBoxRef = useRef(null);
 
   // Derived state
   const selectedConversation = useMemo(
@@ -146,6 +147,11 @@ function Dashboard() {
     return () => socket.close();
   }, []);
 
+  useEffect(() => {
+    if (!chatBoxRef.current) return;
+    chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+  }, [messages]);
+
   // Handlers
   const handleSend = async () => {
     if (!selectedConversationId || !replyText.trim()) return;
@@ -224,7 +230,7 @@ function Dashboard() {
             ? `Chat ${selectedConversation.external_user_id}`
             : "Selecciona una conversación"}
         </h3>
-        <div style={styles.chatBox}>
+        <div ref={chatBoxRef} style={styles.chatBox}>
           {messages.map((msg) => {
             const isOperator = msg.role === "agent";
             return (
