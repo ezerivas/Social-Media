@@ -96,19 +96,25 @@ class MessagingService:
         # Get channel adapter
         channel_adapter = self._get_channel(channel_name)
 
-        # Get channel configuration
+        # Get channel configuration (optional)
         channel_config = await self.repository.get_channel_config(tenant_id, channel_name)
-        if not channel_config:
-            raise ValueError(f"Configuration not found for channel {channel_name}")
 
-        # Send via channel adapter
-        success = await channel_adapter.send_text(
-            recipient_id=external_user_id,
-            message_text=content,
-            config=channel_config,
-        )
+        # Try to send via channel adapter (if config exists)
+        send_success = False
+        if channel_config:
+            try:
+                send_success = await channel_adapter.send_text(
+                    recipient_id=external_user_id,
+                    message_text=content,
+                    config=channel_config,
+                )
+            except Exception as e:
+                logger.warning("Failed to send via channel adapter: %s", e)
+        else:
+            logger.warning("No channel config found, skipping external send")
+            send_success = True  # Allow saving without external send
 
-        if not success:
+        if not send_success:
             logger.error("Failed to send message via channel adapter")
             return None
 
