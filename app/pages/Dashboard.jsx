@@ -1,54 +1,154 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function Dashboard() {
-  // Guardamos el socket para poder reutilizarlo si hace falta
   const socketRef = useRef(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
 
   useEffect(() => {
-    // 🔌 Conexión al WebSocket del backend (Railway)
+    // 🔌 conectar WebSocket
     const socket = new WebSocket(
       "wss://social-media-production-0ef2.up.railway.app/ws/1"
     );
 
     socketRef.current = socket;
 
-    // 🟢 Cuando conecta correctamente
+    // 🟢 conexión abierta
     socket.onopen = () => {
-      console.log("🟢 Conectado al WebSocket");
-
-      // mensaje de prueba al backend
-      socket.send("hola desde frontend");
+      console.log("🟢 conectado");
+      socket.send("frontend conectado");
     };
 
-    // 📩 Cuando llega un mensaje del servidor
+    // 📩 recibir mensajes
     socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
+      try {
+        const data = JSON.parse(event.data);
 
-  console.log("📩 evento:", data.event);
-  console.log("💬 mensaje:", data.data);
-};
-
-    // ❌ Errores de conexión
-    socket.onerror = (error) => {
-      console.error("❌ Error WebSocket:", error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            text: data.data,
+            type: "received",
+          },
+        ]);
+      } catch (e) {
+        console.log("error parse:", event.data);
+      }
     };
 
-    // 🔴 Cuando se cierra la conexión
+    // ❌ error
+    socket.onerror = (err) => {
+      console.error("❌ error websocket", err);
+    };
+
+    // 🔴 cierre
     socket.onclose = () => {
-      console.log("🔴 WebSocket cerrado");
+      console.log("🔴 desconectado");
     };
 
-    // 🧹 Cleanup al salir del componente
-    return () => {
-      socket.close();
-    };
+    return () => socket.close();
   }, []);
 
+  // 📤 enviar mensaje
+  const sendMessage = () => {
+    if (!input.trim()) return;
+
+    const msg = {
+      text: input,
+      type: "sent",
+    };
+
+    // mostrar en UI
+    setMessages((prev) => [...prev, msg]);
+
+    // enviar al backend
+    socketRef.current?.send(input);
+
+    setInput("");
+  };
+
   return (
-    <div>
-      <h1>Dashboard WebSocket en tiempo real</h1>
+    <div style={styles.container}>
+      <h2 style={styles.title}>💬 Chat en tiempo real</h2>
+
+      {/* mensajes */}
+      <div style={styles.chatBox}>
+        {messages.map((msg, i) => (
+          <div
+            key={i}
+            style={{
+              ...styles.message,
+              alignSelf: msg.type === "sent" ? "flex-end" : "flex-start",
+              backgroundColor: msg.type === "sent" ? "#4caf50" : "#333",
+            }}
+          >
+            {msg.text}
+          </div>
+        ))}
+      </div>
+
+      {/* input */}
+      <div style={styles.inputBox}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Escribí un mensaje..."
+          style={styles.input}
+          onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+        />
+        <button onClick={sendMessage} style={styles.button}>
+          Enviar
+        </button>
+      </div>
     </div>
   );
 }
+
+const styles = {
+  container: {
+    maxWidth: 600,
+    margin: "0 auto",
+    fontFamily: "Arial",
+  },
+  title: {
+    textAlign: "center",
+  },
+  chatBox: {
+    height: 400,
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    padding: 10,
+    display: "flex",
+    flexDirection: "column",
+    overflowY: "auto",
+    backgroundColor: "#111",
+    color: "#fff",
+  },
+  message: {
+    padding: 10,
+    borderRadius: 10,
+    margin: "5px 0",
+    maxWidth: "70%",
+  },
+  inputBox: {
+    display: "flex",
+    marginTop: 10,
+  },
+  input: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    border: "1px solid #ccc",
+  },
+  button: {
+    marginLeft: 10,
+    padding: "10px 20px",
+    backgroundColor: "#2196f3",
+    color: "#fff",
+    border: "none",
+    borderRadius: 5,
+    cursor: "pointer",
+  },
+};
 
 export default Dashboard;
