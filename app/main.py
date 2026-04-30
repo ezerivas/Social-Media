@@ -20,7 +20,9 @@ app = FastAPI(title="Omnichannel Live", lifespan=lifespan)
 
 # --- RUTAS ---
 app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
-
+@app.get("/health")
+async def health():
+    return {"ok": True}
 @app.websocket("/ws/{tenant_id}")
 async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
     await manager.connect(websocket, tenant_id)
