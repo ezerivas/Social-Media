@@ -20,7 +20,7 @@ app = FastAPI(title="Omnichannel Live", lifespan=lifespan)
 
 # --- RUTAS ---
 app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
-app.include_router(messages.router, prefix="/api/v1/messages", tags=["Messages"])
+
 
 # --- ENDPOINT WEBSOCKET ---
 @app.websocket("/ws/{tenant_id}")
