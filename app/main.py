@@ -21,20 +21,32 @@ app = FastAPI(title="Omnichannel Live", lifespan=lifespan)
 # --- RUTAS ---
 app.include_router(facebook.router, prefix="/webhooks", tags=["Webhooks"])
 
-
-# --- ENDPOINT WEBSOCKET ---
 @app.websocket("/ws/{tenant_id}")
 async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
     await manager.connect(websocket, tenant_id)
 
     try:
+        # 🔥 mantener conexión viva con ping lógico
         while True:
-            data = await websocket.receive_text()
-            print("📩 Mensaje recibido:", data)
+            try:
+                data = await websocket.receive_text()
+                print("📩 Recibido:", data)
 
-            # 👇 RESPUESTA (para que el frontend reciba algo)
-            await websocket.send_text(f"Echo: {data}")
+                # responder algo SIEMPRE
+                await manager.broadcast_to_tenant(
+                    tenant_id,
+                    {
+                        "event": "message",
+                        "data": data
+                    }
+                )
 
-    except WebSocketDisconnect:
+            except Exception as inner:
+                print("⚠️ Error interno WS:", inner)
+                break
+
+    except Exception as e:
+        print("🔴 WS cerrado:", e)
+
+    finally:
         manager.disconnect(websocket, tenant_id)
-        print("🔴 Cliente desconectado")

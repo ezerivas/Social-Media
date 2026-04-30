@@ -1,41 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 function Dashboard() {
-  const [messages, setMessages] = useState([]);
-
   useEffect(() => {
     const socket = new WebSocket(
       "wss://social-media-production-0ef2.up.railway.app/ws/1"
     );
 
     socket.onopen = () => {
-      console.log("🟢 Conectado al WebSocket");
+      console.log("🟢 Conectado");
+      socket.send("hola desde frontend");
     };
 
     socket.onmessage = (event) => {
-      console.log("📩 Mensaje recibido:", event.data);
+      console.log("📩 Mensaje:", event.data);
+    };
 
-      setMessages((prev) => [...prev, event.data]);
+    socket.onerror = (e) => {
+      console.error("❌ Error:", e);
     };
 
     socket.onclose = () => {
-      console.log("🔴 WebSocket cerrado");
+      console.log("🔴 Cerrado");
     };
 
-    return () => {
-      socket.close();
-    };
+    return () => socket.close();
   }, []);
 
-  return (
-    <div>
-      <h1>Dashboard en tiempo real</h1>
-
-      {messages.map((msg, i) => (
-        <p key={i}>{msg}</p>
-      ))}
-    </div>
-  );
+  return <h1>Probando WebSocket...</h1>;
 }
 
 export default Dashboard;

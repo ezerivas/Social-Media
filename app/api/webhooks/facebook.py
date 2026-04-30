@@ -32,31 +32,39 @@ async def handle_facebook_events(
     try:
         for entry in payload.get("entry", []):
             for messaging_event in entry.get("messaging", []):
+
                 sender_id = messaging_event["sender"]["id"]
                 message_text = messaging_event.get("message", {}).get("text")
 
-                if message_text:
-                    message = await repo.save_message(
-                        tenant_id=1,
-                        user_external_id=sender_id,
-                        channel="facebook",
-                        content=message_text,
-                        role="user"
-                    )
+                if not message_text:
+                    continue
 
-                    print(f"✅ Mensaje guardado: {message_text}")
+                message = await repo.save_message(
+                    tenant_id=1,
+                    user_external_id=sender_id,
+                    channel="facebook",
+                    content=message_text,
+                    role="user"
+                )
 
-                    # 🔥 realtime
-                    await manager.broadcast_to_tenant(
-                        1,
-                        {
-                            "event": "new_message",
-                            "data": message
+                print(f"✅ Guardado: {message_text}")
+
+                # 🔥 DEBUG IMPORTANTE
+                print("📡 Enviando por WS...")
+
+                await manager.broadcast_to_tenant(
+                    1,
+                    {
+                        "event": "new_message",
+                        "data": {
+                            "text": message_text,
+                            "sender": sender_id
                         }
-                    )
+                    }
+                )
 
         return {"status": "success"}
 
     except Exception as e:
-        print(f"❌ Error webhook: {e}")
+        print("❌ Webhook error:", e)
         return {"status": "error", "message": str(e)}
